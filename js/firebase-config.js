@@ -12,12 +12,12 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "PASTE_ME",
-  authDomain: "PASTE_ME.firebaseapp.com",
-  projectId: "PASTE_ME",
-  storageBucket: "PASTE_ME.appspot.com",
-  messagingSenderId: "PASTE_ME",
-  appId: "PASTE_ME"
+  apiKey: "AIzaSyCDftJk-PrtrBJl2w1E8St_Ln9-pbU8Hk8",
+  authDomain: "vox-chat-e0987.firebaseapp.com",
+  projectId: "vox-chat-e0987",
+  storageBucket: "vox-chat-e0987.firebasestorage.app",
+  messagingSenderId: "846881864369",
+  appId: "1:846881864369:web:39da9987d0a7227d898090"
 };
 
 export const app = initializeApp(firebaseConfig);
