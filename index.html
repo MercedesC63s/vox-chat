@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>vox</title>
-<link rel="icon" href="data:,">
+<link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css" />
@@ -14,6 +14,7 @@
 <!-- ================= AUTH SCREEN ================= -->
 <section id="screen-auth" class="screen active">
   <div class="auth-card">
+    <img src="assets/logo-mark.png" alt="vox" class="logo-mark" />
     <div class="wordmark">vox</div>
     <p class="tagline">a quiet line, kept open.</p>
 
@@ -55,6 +56,10 @@
 
     <!-- Sidebar: chat list -->
     <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="assets/logo-mark.png" alt="" class="logo-mark logo-mark-sm" />
+        <span class="brand-word">vox</span>
+      </div>
       <div class="sidebar-header">
         <div class="me">
           <span class="dot dot-online"></span>
@@ -74,7 +79,15 @@
     <main class="chat-pane">
       <div id="chat-empty" class="chat-empty">
         <div class="ripple-mini"><span></span><span></span><span></span></div>
-        <p>Select a conversation, or start a new one.</p>
+        <div class="new-chat-panel">
+          <h3>Start a conversation</h3>
+          <p class="panel-sub">Enter the email of someone with a vox account.</p>
+          <div class="panel-row">
+            <input type="email" id="new-chat-email" placeholder="name@example.com" />
+            <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
+          </div>
+          <p class="auth-error" id="new-chat-error"></p>
+        </div>
       </div>
 
       <div id="chat-active" class="chat-active" hidden>
@@ -97,19 +110,6 @@
   </div>
 </section>
 
-<!-- ================= NEW CHAT MODAL ================= -->
-<div id="modal-new-chat" class="modal" hidden>
-  <div class="modal-card">
-    <h3>Start a conversation</h3>
-    <p class="modal-sub">Enter the email of someone with a vox account.</p>
-    <input type="email" id="new-chat-email" placeholder="name@example.com" />
-    <p class="auth-error" id="new-chat-error"></p>
-    <div class="modal-actions">
-      <button id="btn-cancel-new-chat" class="btn-ghost">Cancel</button>
-      <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
-    </div>
-  </div>
-</div>
 
 <!-- ================= INCOMING CALL ================= -->
 <div id="screen-incoming" class="screen call-screen" hidden>
