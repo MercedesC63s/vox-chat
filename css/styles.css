@@ -155,22 +155,32 @@ input:focus-visible, button:focus-visible{
 }
 .message-form .icon-btn{ background: var(--white); color:#0a0a0a; border:none; }
 
-/* ---------------- Modal ---------------- */
-.modal{
-  position:fixed; inset:0; background: rgba(0,0,0,.6); display:flex;
-  align-items:center; justify-content:center; z-index:50;
+/* ---------------- Logo ---------------- */
+.logo-mark{
+  width: 72px; height: 72px; display:block; margin: 0 auto 8px;
+  border-radius: 20px;
 }
-.modal-card{
-  width: 320px; background: var(--panel); border:1px solid var(--border);
-  border-radius: var(--radius); padding: 24px;
+.logo-mark-sm{ width: 26px; height: 26px; border-radius: 7px; margin: 0; }
+
+.sidebar-brand{
+  display:flex; align-items:center; gap:9px; padding-bottom: 4px;
 }
-.modal-card h3{ margin:0 0 6px; font-family: var(--font-display); font-size:18px; }
-.modal-sub{ color:var(--text-faint); font-size:12.5px; margin:0 0 16px; }
-.modal-card input{
-  width:100%; background: var(--panel-2); border:1px solid var(--border); color:var(--text);
-  padding:10px 12px; border-radius: var(--radius-sm); font-size:14px; margin-bottom:8px;
+.brand-word{
+  font-family: var(--font-display); font-weight:700; font-size:16px; letter-spacing:-0.03em;
 }
-.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top: 12px; }
+
+/* ---------------- Inline new-conversation panel ---------------- */
+.new-chat-panel{ width: 300px; text-align:center; }
+.new-chat-panel h3{ font-family: var(--font-display); font-size:17px; margin:0 0 4px; color: var(--text); }
+.panel-sub{ color: var(--text-faint); font-size:12.5px; margin: 0 0 16px; }
+.panel-row{ display:flex; gap:8px; }
+.panel-row input{
+  flex:1; background: var(--panel-2); border:1px solid var(--border); color:var(--text);
+  padding:10px 12px; border-radius: var(--radius-sm); font-size:13.5px;
+}
+.panel-row .btn-primary{ margin:0; padding: 0 18px; white-space:nowrap; }
+.new-chat-panel .auth-error{ margin-top:10px; }
+
 
 /* ---------------- Calling screens (signature element) ---------------- */
 .call-screen{
