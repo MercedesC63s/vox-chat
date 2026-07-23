@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>vox</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- ================= AUTH SCREEN ================= -->
+<section id="screen-auth" class="screen active">
+  <div class="auth-card">
+    <div class="wordmark">vox</div>
+    <p class="tagline">a quiet line, kept open.</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Log in</button>
+      <button class="auth-tab" data-tab="signup">Sign up</button>
+    </div>
+
+    <form id="form-login" class="auth-form active">
+      <label>Email
+        <input type="email" id="login-email" required autocomplete="email" />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn-primary">Enter</button>
+      <p class="auth-error" id="login-error"></p>
+    </form>
+
+    <form id="form-signup" class="auth-form">
+      <label>Display name
+        <input type="text" id="signup-name" required maxlength="24" />
+      </label>
+      <label>Email
+        <input type="email" id="signup-email" required autocomplete="email" />
+      </label>
+      <label>Password
+        <input type="password" id="signup-password" required minlength="6" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn-primary">Create account</button>
+      <p class="auth-error" id="signup-error"></p>
+    </form>
+  </div>
+</section>
+
+<!-- ================= MAIN APP ================= -->
+<section id="screen-app" class="screen">
+  <div class="app-shell">
+
+    <!-- Sidebar: chat list -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="me">
+          <span class="dot dot-online"></span>
+          <span id="me-name">—</span>
+        </div>
+        <button id="btn-logout" class="icon-btn" title="Log out">⏻</button>
+      </div>
+
+      <button id="btn-new-chat" class="btn-ghost">+ New conversation</button>
+
+      <div id="chat-list" class="chat-list">
+        <!-- populated by js -->
+      </div>
+    </aside>
+
+    <!-- Main: active chat -->
+    <main class="chat-pane">
+      <div id="chat-empty" class="chat-empty">
+        <div class="ripple-mini"><span></span><span></span><span></span></div>
+        <p>Select a conversation, or start a new one.</p>
+      </div>
+
+      <div id="chat-active" class="chat-active" hidden>
+        <header class="chat-header">
+          <div class="peer-info">
+            <span class="dot" id="peer-status"></span>
+            <span id="peer-name">—</span>
+          </div>
+          <button id="btn-call" class="icon-btn icon-btn-call" title="Call">◐</button>
+        </header>
+
+        <div id="messages" class="messages"></div>
+
+        <form id="form-message" class="message-form">
+          <input type="text" id="message-input" placeholder="Message" autocomplete="off" />
+          <button type="submit" class="icon-btn">↑</button>
+        </form>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ================= NEW CHAT MODAL ================= -->
+<div id="modal-new-chat" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Start a conversation</h3>
+    <p class="modal-sub">Enter the email of someone with a vox account.</p>
+    <input type="email" id="new-chat-email" placeholder="name@example.com" />
+    <p class="auth-error" id="new-chat-error"></p>
+    <div class="modal-actions">
+      <button id="btn-cancel-new-chat" class="btn-ghost">Cancel</button>
+      <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= INCOMING CALL ================= -->
+<div id="screen-incoming" class="screen call-screen" hidden>
+  <div class="call-body">
+    <div class="ripple"><span></span><span></span><span></span></div>
+    <div class="call-avatar" id="incoming-initial">–</div>
+    <div class="call-name" id="incoming-name">—</div>
+    <div class="call-status">incoming call</div>
+  </div>
+  <div class="call-actions">
+    <button id="btn-decline" class="call-btn call-btn-decline" title="Decline">✕</button>
+    <button id="btn-accept" class="call-btn call-btn-accept" title="Accept">✓</button>
+  </div>
+</div>
+
+<!-- ================= OUTGOING / ACTIVE CALL ================= -->
+<div id="screen-call" class="screen call-screen" hidden>
+  <div class="call-body">
+    <div class="ripple" id="call-ripple"><span></span><span></span><span></span></div>
+    <div class="call-avatar" id="call-initial">–</div>
+    <div class="call-name" id="call-peer-name">—</div>
+    <div class="call-status" id="call-status">calling…</div>
+    <div class="call-timer" id="call-timer" hidden>00:00</div>
+  </div>
+  <audio id="remote-audio" autoplay playsinline></audio>
+  <div class="call-actions call-actions-active">
+    <button id="btn-mute" class="call-btn call-btn-secondary" title="Mute">◍</button>
+    <button id="btn-hold" class="call-btn call-btn-secondary" title="Hold">❚❚</button>
+    <button id="btn-hangup" class="call-btn call-btn-decline" title="End call">✕</button>
+  </div>
+</div>
+
+<script type="module" src="js/firebase-config.js"></script>
+<script type="module" src="js/app.js"></script>
+<script type="module" src="js/auth.js"></script>
+<script type="module" src="js/chat.js"></script>
+<script type="module" src="js/call.js"></script>
+</body>
+</html>
