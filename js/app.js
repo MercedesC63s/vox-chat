@@ -19,10 +19,32 @@ export function initials(name) {
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     state.user = user;
-    const snap = await getDoc(doc(db, "users", user.uid));
-    state.profile = snap.exists() ? snap.data() : { uid: user.uid, displayName: user.displayName, email: user.email };
+
+    // Load (or self-heal) the profile doc. A Firestore hiccup here should
+    // never trap the user on the login screen — fall back to what we
+    // already know from the auth account itself.
+    state.profile = { uid: user.uid, displayName: user.displayName || "you", email: (user.email || "").toLowerCase() };
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if (snap.exists()) {
+        state.profile = snap.data();
+      } else {
+        // Profile doc never got created (e.g. signup's write failed) — recreate it now.
+        await setDoc(doc(db, "users", user.uid), {
+          uid: user.uid,
+          displayName: state.profile.displayName,
+          email: state.profile.email,
+          createdAt: serverTimestamp(),
+          status: "online"
+        });
+      }
+    } catch (err) {
+      console.error("Could not load/create profile doc — check that Firestore rules are published:", err);
+    }
+
     document.getElementById("me-name").textContent = state.profile.displayName || "you";
-    await updateDoc(doc(db, "users", user.uid), { status: "online" }).catch(() => {});
+    updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
+
     screenAuth.classList.remove("active");
     screenApp.classList.add("active");
     listenToChats();
