@@ -44,13 +44,19 @@ document.getElementById("form-signup").addEventListener("submit", async (e) => {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: name });
-    await setDoc(doc(db, "users", cred.user.uid), {
-      uid: cred.user.uid,
-      displayName: name,
-      email: email.toLowerCase(),
-      createdAt: serverTimestamp(),
-      status: "online"
-    });
+    try {
+      await setDoc(doc(db, "users", cred.user.uid), {
+        uid: cred.user.uid,
+        displayName: name,
+        email: email.toLowerCase(),
+        createdAt: serverTimestamp(),
+        status: "online"
+      });
+    } catch (profileErr) {
+      // The account itself was created fine — this is just the Firestore
+      // profile doc, which app.js will self-heal on next load if it's missing.
+      console.error("Profile doc write failed (check Firestore rules are published):", profileErr);
+    }
   } catch (err) {
     errEl.textContent = friendlyAuthError(err);
   }
