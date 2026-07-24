@@ -12,6 +12,9 @@ import { requestNotificationPermission, notify } from "./notifications.js";
 const screenAuth = document.getElementById("screen-auth");
 const screenApp = document.getElementById("screen-app");
 
+// YOUR ACCOUNT EMAIL - CHANGE THIS TO RESTRICT MOD MENU TO ONLY YOU
+const MOD_ONLY_EMAIL = "your-email@example.com";
+
 export function initials(name) {
   if (!name) return "?";
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
@@ -68,7 +71,9 @@ onAuthStateChanged(auth, async (user) => {
     }
     document.getElementById("screen-banned").classList.remove("active");
 
-    document.getElementById("btn-mod-menu").hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
+    // Restrict mod menu to specific email only
+    const isModRestricted = state.profile.email === MOD_ONLY_EMAIL && (state.profile.role === "owner" || state.profile.role === "admin");
+    document.getElementById("btn-mod-menu").hidden = !isModRestricted;
 
     updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
 
