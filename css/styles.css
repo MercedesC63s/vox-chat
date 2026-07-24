@@ -132,6 +132,9 @@ input:focus-visible, button:focus-visible{
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
   color: var(--text-faint); gap:18px; font-size:13px;
 }
+.empty-placeholder{ display:flex; flex-direction:column; align-items:center; gap:16px; }
+.empty-placeholder .btn-primary{ padding: 10px 20px; }
+.btn-cancel-new-chat{ display:block; margin: 14px auto 0; }
 .chat-active{ flex:1; display:flex; flex-direction:column; min-height:0; }
 .chat-header{
   display:flex; align-items:center; justify-content:space-between;
