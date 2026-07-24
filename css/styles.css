@@ -108,7 +108,7 @@ input:focus-visible, button:focus-visible{
   transition: border-color .15s var(--ease), color .15s var(--ease);
 }
 .icon-btn:hover{ border-color: var(--white); color: var(--white); }
-.icon-btn-call{ font-size:16px; }
+.icon-btn-call{ font-size:18px; }
 
 .chat-list{ overflow-y:auto; display:flex; flex-direction:column; gap:2px; flex:1; }
 .chat-item{
@@ -135,25 +135,12 @@ input:focus-visible, button:focus-visible{
 .empty-placeholder{ display:flex; flex-direction:column; align-items:center; gap:16px; }
 .empty-placeholder .btn-primary{ padding: 10px 20px; }
 .btn-cancel-new-chat{ display:block; margin: 14px auto 0; }
-.new-chat-panel{ 
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-  z-index: 50;
-  max-width: 90%;
-  width: 400px;
-}
 .chat-active{ flex:1; display:flex; flex-direction:column; min-height:0; }
-.chat-header{
-  display:flex; align-items:center; justify-content:space-between;
-  padding: 16px 24px; border-bottom:1px solid var(--border);
+
+.peer-info{ 
+  display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px;
+  padding: 12px 24px; border-bottom:1px solid var(--border);
 }
-.peer-info{ display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px; }
 
 .messages{ flex:1; overflow-y:auto; padding: 20px 24px; display:flex; flex-direction:column; gap:10px; }
 .msg{
@@ -185,17 +172,37 @@ input:focus-visible, button:focus-visible{
   font-family: var(--font-display); font-weight:700; font-size:16px; letter-spacing:-0.03em;
 }
 
-/* ---------------- Inline new-conversation panel (now modal overlay) ---------------- */
-
-/* ============================================================
-   Mod menu overlay fix
-   ============================================================ */
-#screen-mod {
-  display: none !important;
+/* ---------------- Inline new-conversation panel (modal overlay) ---------------- */
+.new-chat-panel{ 
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  z-index: 150;
+  max-width: 90%;
+  width: 400px;
 }
+.new-chat-panel h3{ font-family: var(--font-display); font-size:17px; margin:0 0 4px; color: var(--text); }
+.panel-sub{ color: var(--text-faint); font-size:12.5px; margin: 0 0 16px; }
+.panel-row{ display:flex; gap:8px; }
+.panel-row input{
+  flex:1; background: var(--panel-2); border:1px solid var(--border); color:var(--text);
+  padding:10px 12px; border-radius: var(--radius-sm); font-size:13.5px;
+}
+.panel-row .btn-primary{ margin:0; padding: 0 18px; white-space:nowrap; }
+.new-chat-panel .auth-error{ margin-top:10px; }
 
-#screen-mod:not([hidden]) {
-  display: flex !important;
+/* Overlay for modal */
+.chat-empty.new-chat-panel-open::before{
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 100;
 }
 
 /* ---------------- Calling screens (signature element) ---------------- */
