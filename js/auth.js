@@ -50,7 +50,10 @@ document.getElementById("form-signup").addEventListener("submit", async (e) => {
         displayName: name,
         email: email.toLowerCase(),
         createdAt: serverTimestamp(),
-        status: "online"
+        status: "online",
+        role: "member",
+        tag: "",
+        banned: false
       });
     } catch (profileErr) {
       // The account itself was created fine — this is just the Firestore
@@ -64,6 +67,7 @@ document.getElementById("form-signup").addEventListener("submit", async (e) => {
 
 // ---- logout ----
 document.getElementById("btn-logout").addEventListener("click", () => signOut(auth));
+document.getElementById("btn-banned-logout").addEventListener("click", () => signOut(auth));
 
 function friendlyAuthError(err) {
   const code = err.code || "";
