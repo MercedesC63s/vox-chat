@@ -6,14 +6,11 @@ import {
   onSnapshot, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { openChat } from "./chat.js";
-import { listenForIncomingCalls } from "./call.js";
+import { listenForIncomingCalls, initiateCall } from "./call.js";
 import { requestNotificationPermission, notify } from "./notifications.js";
 
 const screenAuth = document.getElementById("screen-auth");
 const screenApp = document.getElementById("screen-app");
-
-// YOUR ACCOUNT EMAIL - CHANGE THIS TO RESTRICT MOD MENU TO ONLY YOU
-const MOD_ONLY_EMAIL = "oliver.furina@marymede.vic.edu.au";
 
 export function initials(name) {
   if (!name) return "?";
@@ -71,9 +68,7 @@ onAuthStateChanged(auth, async (user) => {
     }
     document.getElementById("screen-banned").classList.remove("active");
 
-    // Restrict mod menu to specific email only
-    const isModRestricted = state.profile.email === MOD_ONLY_EMAIL && (state.profile.role === "owner" || state.profile.role === "admin");
-    document.getElementById("btn-mod-menu").hidden = !isModRestricted;
+    document.getElementById("btn-mod-menu").hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
 
     updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
 
@@ -134,49 +129,28 @@ export function escapeHtml(str = "") {
   return d.innerHTML;
 }
 
-// ---- new conversation (inline panel, revealed on demand — no popup) ----
+// ---- add friend modal ----
 const emailInput = document.getElementById("new-chat-email");
 const errEl = document.getElementById("new-chat-error");
 const startBtn = document.getElementById("btn-confirm-new-chat");
-const emptyPlaceholder = document.getElementById("empty-placeholder");
-const newChatPanel = document.getElementById("new-chat-panel");
+const modal = document.getElementById("add-friend-modal");
 
-function goToEmptyScreen() {
-  if (state.unsubMessages) { state.unsubMessages(); state.unsubMessages = null; }
-  if (state.unsubPeerDoc) { state.unsubPeerDoc(); state.unsubPeerDoc = null; }
-  state.activeChatId = null;
-  state.activePeer = null;
-  document.getElementById("chat-active").hidden = true;
-  document.getElementById("chat-empty").hidden = false;
-  document.querySelector(".app-shell")?.classList.remove("chat-open");
-  document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
-  showPlaceholder();
-}
-
-function showPlaceholder() {
-  newChatPanel.hidden = true;
-  emptyPlaceholder.hidden = false;
-}
-
-function showNewChatPanel() {
-  emptyPlaceholder.hidden = true;
-  newChatPanel.hidden = false;
+function showAddFriendModal() {
+  modal.hidden = false;
   errEl.textContent = "";
   emailInput.value = "";
   emailInput.focus();
 }
 
-// Sidebar's "+ New conversation" — return to the empty screen, panel open.
-document.getElementById("btn-new-chat").addEventListener("click", () => {
-  goToEmptyScreen();
-  showNewChatPanel();
-});
+function hideAddFriendModal() {
+  modal.hidden = true;
+}
 
-// "+ Add friend" on the empty screen itself — just reveal the panel.
-document.getElementById("btn-show-new-chat").addEventListener("click", showNewChatPanel);
+// "+ Add friend" button in sidebar
+document.getElementById("btn-new-chat").addEventListener("click", showAddFriendModal);
 
-// Cancel — back to the placeholder.
-document.getElementById("btn-cancel-new-chat").addEventListener("click", showPlaceholder);
+// Cancel button
+document.getElementById("btn-cancel-new-chat").addEventListener("click", hideAddFriendModal);
 
 async function startConversation() {
   const email = emailInput.value.trim().toLowerCase();
@@ -209,6 +183,7 @@ async function startConversation() {
       });
     }
     emailInput.value = "";
+    hideAddFriendModal();
     openChat(chatId, peer);
   } catch (err) {
     console.error("startConversation failed:", err);
