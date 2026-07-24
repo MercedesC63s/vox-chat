@@ -79,11 +79,11 @@
       </div>
     </aside>
 
-    <!-- Main: active chat -->
+    <!-- Main: chat area -->
     <main class="chat-pane">
       <div id="chat-empty" class="chat-empty">
         <div class="ripple-mini"><span></span><span></span><span></span></div>
-        <p>Select a conversation to start chatting</p>
+        <p>Select a conversation or add a friend to start chatting</p>
       </div>
 
       <div id="chat-active" class="chat-active" hidden>
@@ -91,7 +91,7 @@
           <span class="dot" id="peer-status"></span>
           <span id="peer-name">—</span>
           <span id="peer-badge"></span>
-          <button id="btn-call" class="icon-btn icon-btn-call" title="Call" style="margin-left: auto;">☎</button>
+          <button id="btn-call" class="icon-btn icon-btn-call" title="Call">☎</button>
         </div>
 
         <div id="messages" class="messages"></div>
@@ -102,6 +102,20 @@
         </form>
       </div>
     </main>
+  </div>
+
+  <!-- Add friend modal -->
+  <div id="add-friend-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h3>Add friend</h3>
+      <p class="panel-sub">Enter their email address</p>
+      <div class="panel-row">
+        <input type="email" id="new-chat-email" placeholder="name@example.com" />
+        <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
+      </div>
+      <p class="auth-error" id="new-chat-error"></p>
+      <button id="btn-cancel-new-chat" class="btn-ghost">Cancel</button>
+    </div>
   </div>
 </section>
 
@@ -124,7 +138,7 @@
 <div id="screen-call" class="screen call-screen" hidden>
   <video id="remote-video" class="remote-video no-video" autoplay playsinline></video>
   <video id="local-video" class="local-video no-video" autoplay playsinline muted></video>
-  <div class="call-body">
+  <div class="call-body" id="call-body">
     <div class="ripple" id="call-ripple"><span></span><span></span><span></span></div>
     <div class="call-avatar" id="call-initial">–</div>
     <div class="call-name" id="call-peer-name">—</div>
