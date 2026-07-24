@@ -64,8 +64,12 @@
         <div class="me">
           <span class="dot dot-online"></span>
           <span id="me-name">—</span>
+          <span id="me-badge"></span>
         </div>
-        <button id="btn-logout" class="icon-btn" title="Log out">⏻</button>
+        <div class="header-actions">
+          <button id="btn-mod-menu" class="icon-btn" title="Mod menu" hidden>◆</button>
+          <button id="btn-logout" class="icon-btn" title="Log out">⏻</button>
+        </div>
       </div>
 
       <button id="btn-new-chat" class="btn-ghost">+ New conversation</button>
@@ -95,6 +99,7 @@
           <div class="peer-info">
             <span class="dot" id="peer-status"></span>
             <span id="peer-name">—</span>
+            <span id="peer-badge"></span>
           </div>
           <button id="btn-call" class="icon-btn icon-btn-call" title="Call">◐</button>
         </header>
@@ -127,6 +132,8 @@
 
 <!-- ================= OUTGOING / ACTIVE CALL ================= -->
 <div id="screen-call" class="screen call-screen" hidden>
+  <video id="remote-video" class="remote-video no-video" autoplay playsinline></video>
+  <video id="local-video" class="local-video no-video" autoplay playsinline muted></video>
   <div class="call-body">
     <div class="ripple" id="call-ripple"><span></span><span></span><span></span></div>
     <div class="call-avatar" id="call-initial">–</div>
@@ -134,18 +141,43 @@
     <div class="call-status" id="call-status">calling…</div>
     <div class="call-timer" id="call-timer" hidden>00:00</div>
   </div>
-  <audio id="remote-audio" autoplay playsinline></audio>
   <div class="call-actions call-actions-active">
-    <button id="btn-mute" class="call-btn call-btn-secondary" title="Mute">◍</button>
+    <button id="btn-mute" class="call-btn call-btn-secondary" title="Mute mic">◍</button>
+    <button id="btn-camera" class="call-btn call-btn-secondary" title="Turn camera off">▢</button>
     <button id="btn-hold" class="call-btn call-btn-secondary" title="Hold">❚❚</button>
     <button id="btn-hangup" class="call-btn call-btn-decline" title="End call">✕</button>
   </div>
 </div>
+
+<!-- ================= MOD MENU ================= -->
+<div id="screen-mod" class="screen mod-screen" hidden>
+  <div class="mod-card">
+    <header class="mod-header">
+      <h2>Mod menu</h2>
+      <button id="btn-close-mod" class="icon-btn" title="Close">✕</button>
+    </header>
+    <p class="panel-sub">Roles and tags are enforced by Firestore rules, not just this screen.</p>
+    <div id="mod-user-list" class="mod-user-list">
+      <!-- populated by js -->
+    </div>
+  </div>
+</div>
+
+<!-- ================= BANNED ================= -->
+<section id="screen-banned" class="screen banned-screen" hidden>
+  <div class="banned-card">
+    <div class="wordmark">vox</div>
+    <p class="banned-msg">This account has been suspended.</p>
+    <button id="btn-banned-logout" class="btn-ghost">Log out</button>
+  </div>
+</section>
 
 <script type="module" src="js/firebase-config.js"></script>
 <script type="module" src="js/app.js"></script>
 <script type="module" src="js/auth.js"></script>
 <script type="module" src="js/chat.js"></script>
 <script type="module" src="js/call.js"></script>
+<script type="module" src="js/mod.js"></script>
+<script type="module" src="js/notifications.js"></script>
 </body>
 </html>
