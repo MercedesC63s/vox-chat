@@ -13,7 +13,7 @@ const screenAuth = document.getElementById("screen-auth");
 const screenApp = document.getElementById("screen-app");
 
 // YOUR ACCOUNT EMAIL - CHANGE THIS TO RESTRICT MOD MENU TO ONLY YOU
-const MOD_ONLY_EMAIL = "your-email@example.com";
+const MOD_ONLY_EMAIL = "oliver.furina@marymede.vic.edu.au";
 
 export function initials(name) {
   if (!name) return "?";
