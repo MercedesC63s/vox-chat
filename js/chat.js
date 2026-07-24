@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { state } from "./state.js";
-import { initials, escapeHtml } from "./app.js";
+import { initials, escapeHtml, renderBadge } from "./app.js";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, orderBy, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -11,6 +11,7 @@ const messagesEl = document.getElementById("messages");
 
 export function openChat(chatId, peer) {
   if (state.unsubMessages) state.unsubMessages();
+  if (state.unsubPeerDoc) state.unsubPeerDoc();
 
   state.activeChatId = chatId;
   state.activePeer = peer;
@@ -22,13 +23,18 @@ export function openChat(chatId, peer) {
 
   document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
 
-  const q = query(collection(db, "chats", chatId, "messages"), orderBy("createdAt", "asc"));
+  // Live badge (role/tag) so a ban, promotion, or tag change shows up immediately.
+  state.unsubPeerDoc = onSnapshot(doc(db, "users", peer.uid), (snap) => {
+    document.getElementById("peer-badge").innerHTML = snap.exists() ? renderBadge(snap.data()) : "";
+  });
+
+  const q = query(collection(db, "chats", chatId, "messages"), orderBy("clientTime", "asc"));
   state.unsubMessages = onSnapshot(q, (snap) => {
     messagesEl.innerHTML = "";
     snap.forEach((docSnap) => {
       const m = docSnap.data();
       const mine = m.senderId === state.user.uid;
-      const time = m.createdAt?.toDate ? m.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      const time = m.clientTime ? new Date(m.clientTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
       const bubble = document.createElement("div");
       bubble.className = "msg " + (mine ? "msg-mine" : "msg-theirs");
       bubble.innerHTML = `${escapeHtml(m.text)}<span class="msg-time">${time}</span>`;
@@ -49,7 +55,8 @@ document.getElementById("form-message").addEventListener("submit", async (e) => 
   await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
     text,
     senderId: state.user.uid,
-    createdAt: serverTimestamp()
+    clientTime: Date.now(),   // set immediately — used for sort order and display, no server round-trip
+    createdAt: serverTimestamp() // kept for reference, not used for ordering
   });
-  await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text });
+  await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text, lastMessageSenderId: state.user.uid });
 });
