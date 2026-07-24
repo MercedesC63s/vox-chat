@@ -129,14 +129,14 @@ export function escapeHtml(str = "") {
   return d.innerHTML;
 }
 
-// ---- new conversation (inline panel, no popup) ----
+// ---- new conversation (inline panel, revealed on demand — no popup) ----
 const emailInput = document.getElementById("new-chat-email");
 const errEl = document.getElementById("new-chat-error");
 const startBtn = document.getElementById("btn-confirm-new-chat");
+const emptyPlaceholder = document.getElementById("empty-placeholder");
+const newChatPanel = document.getElementById("new-chat-panel");
 
-// "+ New conversation" just returns you to the empty/panel view,
-// even if a chat is currently open.
-document.getElementById("btn-new-chat").addEventListener("click", () => {
+function goToEmptyScreen() {
   if (state.unsubMessages) { state.unsubMessages(); state.unsubMessages = null; }
   if (state.unsubPeerDoc) { state.unsubPeerDoc(); state.unsubPeerDoc = null; }
   state.activeChatId = null;
@@ -145,10 +145,33 @@ document.getElementById("btn-new-chat").addEventListener("click", () => {
   document.getElementById("chat-empty").hidden = false;
   document.querySelector(".app-shell")?.classList.remove("chat-open");
   document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
+  showPlaceholder();
+}
+
+function showPlaceholder() {
+  newChatPanel.hidden = true;
+  emptyPlaceholder.hidden = false;
+}
+
+function showNewChatPanel() {
+  emptyPlaceholder.hidden = true;
+  newChatPanel.hidden = false;
   errEl.textContent = "";
   emailInput.value = "";
   emailInput.focus();
+}
+
+// Sidebar's "+ New conversation" — return to the empty screen, panel open.
+document.getElementById("btn-new-chat").addEventListener("click", () => {
+  goToEmptyScreen();
+  showNewChatPanel();
 });
+
+// "+ Add friend" on the empty screen itself — just reveal the panel.
+document.getElementById("btn-show-new-chat").addEventListener("click", showNewChatPanel);
+
+// Cancel — back to the placeholder.
+document.getElementById("btn-cancel-new-chat").addEventListener("click", showPlaceholder);
 
 async function startConversation() {
   const email = emailInput.value.trim().toLowerCase();
