@@ -7,6 +7,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { openChat } from "./chat.js";
 import { listenForIncomingCalls } from "./call.js";
+import { requestNotificationPermission, notify } from "./notifications.js";
 
 const screenAuth = document.getElementById("screen-auth");
 const screenApp = document.getElementById("screen-app");
@@ -14,6 +15,17 @@ const screenApp = document.getElementById("screen-app");
 export function initials(name) {
   if (!name) return "?";
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
+}
+
+// Renders role + custom tag as small badges. Used in the sidebar,
+// chat header, and mod menu so they all stay visually consistent.
+export function renderBadge(profile) {
+  if (!profile) return "";
+  let html = "";
+  if (profile.role === "owner") html += `<span class="badge badge-owner">owner</span>`;
+  else if (profile.role === "admin") html += `<span class="badge badge-admin">admin</span>`;
+  if (profile.tag) html += `<span class="badge badge-tag">${escapeHtml(profile.tag)}</span>`;
+  return html;
 }
 
 onAuthStateChanged(auth, async (user) => {
@@ -35,7 +47,10 @@ onAuthStateChanged(auth, async (user) => {
           displayName: state.profile.displayName,
           email: state.profile.email,
           createdAt: serverTimestamp(),
-          status: "online"
+          status: "online",
+          role: "member",
+          tag: "",
+          banned: false
         });
       }
     } catch (err) {
@@ -43,12 +58,25 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     document.getElementById("me-name").textContent = state.profile.displayName || "you";
+    document.getElementById("me-badge").innerHTML = renderBadge(state.profile);
+
+    if (state.profile.banned) {
+      screenAuth.classList.remove("active");
+      screenApp.classList.remove("active");
+      document.getElementById("screen-banned").classList.add("active");
+      return;
+    }
+    document.getElementById("screen-banned").classList.remove("active");
+
+    document.getElementById("btn-mod-menu").hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
+
     updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
 
     screenAuth.classList.remove("active");
     screenApp.classList.add("active");
     listenToChats();
     listenForIncomingCalls();
+    requestNotificationPermission();
   } else {
     state.user = null;
     state.profile = null;
@@ -61,6 +89,20 @@ onAuthStateChanged(auth, async (user) => {
 function listenToChats() {
   const q = query(collection(db, "chats"), where("participants", "array-contains", state.user.uid));
   onSnapshot(q, (snap) => {
+    // Firestore reports every doc as "added" on first attach, and "modified"
+    // on real later changes — so filtering on "modified" here naturally
+    // means we only ever notify for genuinely new incoming messages,
+    // never for the chat history loading in.
+    snap.docChanges().forEach((change) => {
+      if (change.type !== "modified") return;
+      const chat = change.doc.data();
+      if (!chat.lastMessageSenderId || chat.lastMessageSenderId === state.user.uid) return;
+      const isOpenAndFocused = state.activeChatId === change.doc.id && document.hasFocus();
+      if (isOpenAndFocused) return;
+      const peer = chat.participantInfo?.[chat.lastMessageSenderId];
+      notify(peer?.displayName || "New message", chat.lastMessage || "");
+    });
+
     const list = document.getElementById("chat-list");
     list.innerHTML = "";
     snap.forEach((docSnap) => {
@@ -96,6 +138,7 @@ const startBtn = document.getElementById("btn-confirm-new-chat");
 // even if a chat is currently open.
 document.getElementById("btn-new-chat").addEventListener("click", () => {
   if (state.unsubMessages) { state.unsubMessages(); state.unsubMessages = null; }
+  if (state.unsubPeerDoc) { state.unsubPeerDoc(); state.unsubPeerDoc = null; }
   state.activeChatId = null;
   state.activePeer = null;
   document.getElementById("chat-active").hidden = true;
