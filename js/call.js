@@ -2,6 +2,8 @@ import { db } from "./firebase-config.js";
 import { state } from "./state.js";
 import { initials } from "./app.js";
 import { notify } from "./notifications.js";
+import { showToast } from "./toast.js";
+import * as ringtone from "./ringtone.js";
 import {
   collection, doc, addDoc, setDoc, updateDoc, onSnapshot, query,
   where, serverTimestamp, deleteDoc, getDocs
@@ -13,6 +15,8 @@ const ICE_SERVERS = {
 
 let pc = null;
 let localStream = null;
+let screenStream = null;
+let isScreenSharing = false;
 let currentCallId = null;
 let isCaller = false;
 let unsubCallDoc = null;
@@ -47,6 +51,7 @@ function setupLocalVideo() {
   localVideo.srcObject = localStream;
   localVideo.classList.toggle("no-video", !hasVideo || isCameraOff);
   document.getElementById("btn-camera").hidden = !hasVideo;
+  document.getElementById("btn-screenshare").hidden = !hasVideo;
 }
 
 // ---------------- outgoing ----------------
@@ -56,45 +61,55 @@ async function startCall() {
   if (!state.activePeer) return;
   isCaller = true;
 
-  localStream = await getLocalStream();
-  pc = new RTCPeerConnection(ICE_SERVERS);
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-  attachRemoteTrack();
+  try {
+    localStream = await getLocalStream();
+    pc = new RTCPeerConnection(ICE_SERVERS);
+    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+    attachRemoteTrack();
 
-  const callRef = doc(collection(db, "calls"));
-  currentCallId = callRef.id;
+    const callRef = doc(collection(db, "calls"));
+    currentCallId = callRef.id;
 
-  const callerCandidates = collection(callRef, "callerCandidates");
-  pc.onicecandidate = (e) => { if (e.candidate) addDoc(callerCandidates, e.candidate.toJSON()); };
+    const callerCandidates = collection(callRef, "callerCandidates");
+    pc.onicecandidate = (e) => { if (e.candidate) addDoc(callerCandidates, e.candidate.toJSON()); };
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-  await setDoc(callRef, {
-    callerId: state.user.uid,
-    callerName: state.profile.displayName,
-    calleeId: state.activePeer.uid,
-    calleeName: state.activePeer.displayName,
-    offer: { type: offer.type, sdp: offer.sdp },
-    status: "ringing",
-    createdAt: serverTimestamp()
-  });
+    await setDoc(callRef, {
+      callerId: state.user.uid,
+      callerName: state.profile.displayName,
+      calleeId: state.activePeer.uid,
+      calleeName: state.activePeer.displayName,
+      offer: { type: offer.type, sdp: offer.sdp },
+      status: "ringing",
+      createdAt: serverTimestamp()
+    });
 
-  showCallScreen(screenCall, state.activePeer.displayName, "calling…");
-  setupLocalVideo();
+    showCallScreen(screenCall, state.activePeer.displayName, "calling…");
+    setupLocalVideo();
+    ringtone.startRingback();
 
-  unsubCallDoc = onSnapshot(callRef, async (snap) => {
-    const data = snap.data();
-    if (!data) return;
-    if (data.status === "accepted" && data.answer && !pc.currentRemoteDescription) {
-      await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-      document.getElementById("call-status").textContent = "connected";
-      startTimer();
-      listenForCandidates(callRef, "calleeCandidates");
-    }
-    if (data.status === "declined") { endCall("declined"); }
-    if (data.status === "ended") { endCall(); }
-  });
+    unsubCallDoc = onSnapshot(callRef, async (snap) => {
+      const data = snap.data();
+      if (!data) return;
+      if (data.status === "accepted" && data.answer && !pc.currentRemoteDescription) {
+        ringtone.stop();
+        await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        document.getElementById("call-status").textContent = "connected";
+        startTimer();
+        listenForCandidates(callRef, "calleeCandidates");
+      }
+      if (data.status === "declined") { ringtone.stop(); endCall("declined"); }
+      if (data.status === "ended") { ringtone.stop(); endCall(); }
+    });
+  } catch (err) {
+    console.error("Call failed to start:", err);
+    showToast(`Call didn't start: ${err.code || err.message || "unknown error"}`);
+    ringtone.stop();
+    if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+    if (pc) { pc.close(); pc = null; }
+  }
 }
 
 // ---------------- incoming ----------------
@@ -114,42 +129,52 @@ function handleIncomingCall(callId, data) {
   document.getElementById("incoming-initial").textContent = initials(data.callerName);
   showScreen(screenIncoming);
   notify(`Incoming call — ${data.callerName || "Unknown"}`, "tap to open vox");
+  ringtone.startRingtone();
 
   const callRef = doc(db, "calls", callId);
 
   document.getElementById("btn-decline").onclick = async () => {
+    ringtone.stop();
     hideScreen(screenIncoming);
     await updateDoc(callRef, { status: "declined" });
   };
 
   document.getElementById("btn-accept").onclick = async () => {
+    ringtone.stop();
     hideScreen(screenIncoming);
-    localStream = await getLocalStream();
-    pc = new RTCPeerConnection(ICE_SERVERS);
-    localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-    attachRemoteTrack();
+    try {
+      localStream = await getLocalStream();
+      pc = new RTCPeerConnection(ICE_SERVERS);
+      localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+      attachRemoteTrack();
 
-    const calleeCandidates = collection(callRef, "calleeCandidates");
-    pc.onicecandidate = (e) => { if (e.candidate) addDoc(calleeCandidates, e.candidate.toJSON()); };
+      const calleeCandidates = collection(callRef, "calleeCandidates");
+      pc.onicecandidate = (e) => { if (e.candidate) addDoc(calleeCandidates, e.candidate.toJSON()); };
 
-    await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
 
-    await updateDoc(callRef, {
-      status: "accepted",
-      answer: { type: answer.type, sdp: answer.sdp }
-    });
+      await updateDoc(callRef, {
+        status: "accepted",
+        answer: { type: answer.type, sdp: answer.sdp }
+      });
 
-    showCallScreen(screenCall, data.callerName, "connected");
-    setupLocalVideo();
-    startTimer();
-    listenForCandidates(callRef, "callerCandidates");
+      showCallScreen(screenCall, data.callerName, "connected");
+      setupLocalVideo();
+      startTimer();
+      listenForCandidates(callRef, "callerCandidates");
 
-    unsubCallDoc = onSnapshot(callRef, (snap) => {
-      const d = snap.data();
-      if (d?.status === "ended") endCall();
-    });
+      unsubCallDoc = onSnapshot(callRef, (snap) => {
+        const d = snap.data();
+        if (d?.status === "ended") endCall();
+      });
+    } catch (err) {
+      console.error("Call failed to connect:", err);
+      showToast(`Call didn't connect: ${err.code || err.message || "unknown error"}`);
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+      if (pc) { pc.close(); pc = null; }
+    }
   };
 }
 
@@ -220,6 +245,53 @@ document.getElementById("btn-camera").addEventListener("click", (e) => {
   e.currentTarget.title = isCameraOff ? "Turn camera on" : "Turn camera off";
 });
 
+document.getElementById("btn-screenshare").addEventListener("click", toggleScreenShare);
+
+async function toggleScreenShare() {
+  if (!pc) return;
+  const btn = document.getElementById("btn-screenshare");
+
+  if (!isScreenSharing) {
+    try {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    } catch (err) {
+      // User cancelled the share picker, or it's unsupported — not a real error.
+      if (err.name !== "NotAllowedError") console.error("Screen share failed:", err);
+      return;
+    }
+    const screenTrack = screenStream.getVideoTracks()[0];
+    const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+    if (sender) await sender.replaceTrack(screenTrack);
+
+    localVideo.srcObject = screenStream;
+    localVideo.classList.remove("no-video");
+    isScreenSharing = true;
+    btn.classList.add("is-on");
+    btn.title = "Stop sharing screen";
+
+    // Covers both the in-app button AND the browser's own native "Stop sharing" bar.
+    screenTrack.onended = () => { if (isScreenSharing) stopScreenShare(); };
+  } else {
+    stopScreenShare();
+  }
+}
+
+async function stopScreenShare() {
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  const cameraTrack = localStream?.getVideoTracks()[0];
+  const sender = pc?.getSenders().find(s => s.track && s.track.kind === "video");
+  if (sender && cameraTrack) await sender.replaceTrack(cameraTrack).catch(() => {});
+
+  if (localStream) {
+    localVideo.srcObject = localStream;
+    localVideo.classList.toggle("no-video", !cameraTrack || isCameraOff);
+  }
+  isScreenSharing = false;
+  const btn = document.getElementById("btn-screenshare");
+  btn.classList.remove("is-on");
+  btn.title = "Share screen";
+}
+
 document.getElementById("btn-hold").addEventListener("click", (e) => {
   if (!localStream) return;
   isOnHold = !isOnHold;
@@ -237,15 +309,18 @@ document.getElementById("btn-hangup").addEventListener("click", async () => {
 });
 
 async function endCall(reason) {
+  ringtone.stop();
   clearInterval(timerInterval);
   if (unsubCallDoc) { unsubCallDoc(); unsubCallDoc = null; }
   if (unsubRemoteCandidates) { unsubRemoteCandidates(); unsubRemoteCandidates = null; }
   if (pc) { pc.close(); pc = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-  isMuted = false; isOnHold = false; isCameraOff = false;
+  if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+  isMuted = false; isOnHold = false; isCameraOff = false; isScreenSharing = false;
   document.getElementById("btn-mute").classList.remove("is-on");
   document.getElementById("btn-hold").classList.remove("is-on");
   document.getElementById("btn-camera").classList.remove("is-on");
+  document.getElementById("btn-screenshare").classList.remove("is-on");
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   callBody.classList.remove("video-active");
