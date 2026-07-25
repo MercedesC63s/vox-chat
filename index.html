@@ -54,7 +54,7 @@
 <section id="screen-app" class="screen">
   <div class="app-shell">
 
-    <!-- Sidebar: chat list -->
+    <!-- Sidebar: chat list (slides in as a drawer) -->
     <aside class="sidebar">
       <div class="sidebar-brand">
         <img src="assets/logo-mark.png" alt="" class="logo-mark logo-mark-sm" />
@@ -72,27 +72,53 @@
         </div>
       </div>
 
-      <button id="btn-new-chat" class="btn-ghost">+ Add friend</button>
+      <button id="btn-new-chat" class="btn-ghost">+ New conversation</button>
 
       <div id="chat-list" class="chat-list">
         <!-- populated by js -->
       </div>
     </aside>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
 
-    <!-- Main: chat area -->
+    <!-- Main: active chat -->
     <main class="chat-pane">
       <div id="chat-empty" class="chat-empty">
-        <div class="ripple-mini"><span></span><span></span><span></span></div>
-        <p>Select a conversation or add a friend to start chatting</p>
+        <button id="btn-menu-empty" class="icon-btn btn-menu btn-menu-empty" title="Menu">☰</button>
+        <div id="empty-placeholder" class="empty-placeholder">
+          <div class="ripple-mini"><span></span><span></span><span></span></div>
+          <p>Select a conversation, or add a friend to start one.</p>
+          <button id="btn-show-new-chat" class="btn-primary">+ Add friend</button>
+        </div>
+
+        <div id="new-chat-panel" class="new-chat-panel" hidden>
+          <h3>Start a conversation</h3>
+          <p class="panel-sub">Enter your friend's display name.</p>
+          <div class="panel-row">
+            <input type="text" id="new-chat-name" placeholder="Display name" />
+            <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
+          </div>
+          <p class="auth-error" id="new-chat-error"></p>
+          <div id="new-chat-matches" class="new-chat-matches"></div>
+          <button id="btn-cancel-new-chat" class="btn-ghost btn-cancel-new-chat">Cancel</button>
+        </div>
       </div>
 
       <div id="chat-active" class="chat-active" hidden>
-        <div class="peer-info">
-          <span class="dot" id="peer-status"></span>
-          <span id="peer-name">—</span>
-          <span id="peer-badge"></span>
-          <button id="btn-call" class="icon-btn icon-btn-call" title="Call">☎</button>
-        </div>
+        <header class="chat-header">
+          <div class="chat-header-left">
+            <button id="btn-menu-chat" class="icon-btn btn-menu" title="Menu">☰</button>
+            <div class="peer-info">
+              <span class="dot" id="peer-status"></span>
+              <span id="peer-name">—</span>
+              <span id="peer-badge"></span>
+            </div>
+          </div>
+          <button id="btn-call" class="icon-btn icon-btn-call" title="Call">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </button>
+        </header>
 
         <div id="messages" class="messages"></div>
 
@@ -102,20 +128,6 @@
         </form>
       </div>
     </main>
-  </div>
-
-  <!-- Add friend modal -->
-  <div id="add-friend-modal" class="modal-overlay" hidden>
-    <div class="modal-card">
-      <h3>Add friend</h3>
-      <p class="panel-sub">Enter their email address</p>
-      <div class="panel-row">
-        <input type="email" id="new-chat-email" placeholder="name@example.com" />
-        <button id="btn-confirm-new-chat" class="btn-primary">Start</button>
-      </div>
-      <p class="auth-error" id="new-chat-error"></p>
-      <button id="btn-cancel-new-chat" class="btn-ghost">Cancel</button>
-    </div>
   </div>
 </section>
 
@@ -138,7 +150,7 @@
 <div id="screen-call" class="screen call-screen" hidden>
   <video id="remote-video" class="remote-video no-video" autoplay playsinline></video>
   <video id="local-video" class="local-video no-video" autoplay playsinline muted></video>
-  <div class="call-body" id="call-body">
+  <div class="call-body">
     <div class="ripple" id="call-ripple"><span></span><span></span><span></span></div>
     <div class="call-avatar" id="call-initial">–</div>
     <div class="call-name" id="call-peer-name">—</div>
@@ -148,6 +160,7 @@
   <div class="call-actions call-actions-active">
     <button id="btn-mute" class="call-btn call-btn-secondary" title="Mute mic">◍</button>
     <button id="btn-camera" class="call-btn call-btn-secondary" title="Turn camera off">▢</button>
+    <button id="btn-screenshare" class="call-btn call-btn-secondary" title="Share screen">⧉</button>
     <button id="btn-hold" class="call-btn call-btn-secondary" title="Hold">❚❚</button>
     <button id="btn-hangup" class="call-btn call-btn-decline" title="End call">✕</button>
   </div>
@@ -183,5 +196,7 @@
 <script type="module" src="js/call.js"></script>
 <script type="module" src="js/mod.js"></script>
 <script type="module" src="js/notifications.js"></script>
+<script type="module" src="js/toast.js"></script>
+<script type="module" src="js/ringtone.js"></script>
 </body>
 </html>
