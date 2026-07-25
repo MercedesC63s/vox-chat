@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { state } from "./state.js";
 import { initials, escapeHtml, renderBadge } from "./app.js";
+import { showToast } from "./toast.js";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, orderBy, query, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -52,11 +53,17 @@ document.getElementById("form-message").addEventListener("submit", async (e) => 
   if (!text) return;
   input.value = "";
 
-  await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
-    text,
-    senderId: state.user.uid,
-    clientTime: Date.now(),   // set immediately — used for sort order and display, no server round-trip
-    createdAt: serverTimestamp() // kept for reference, not used for ordering
-  });
-  await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text, lastMessageSenderId: state.user.uid });
+  try {
+    await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
+      text,
+      senderId: state.user.uid,
+      clientTime: Date.now(),   // set immediately — used for sort order and display, no server round-trip
+      createdAt: serverTimestamp() // kept for reference, not used for ordering
+    });
+    await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text, lastMessageSenderId: state.user.uid });
+  } catch (err) {
+    console.error("Send message failed:", err);
+    showToast(`Message didn't send: ${err.code || err.message || "unknown error"}`);
+    input.value = text; // give it back so nothing's lost
+  }
 });
