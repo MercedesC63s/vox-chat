@@ -71,7 +71,7 @@ async function startCall() {
     currentCallId = callRef.id;
 
     const callerCandidates = collection(callRef, "callerCandidates");
-    pc.onicecandidate = (e) => { if (e.candidate) addDoc(callerCandidates, e.candidate.toJSON()); };
+    pc.onicecandidate = (e) => { if (e.candidate) addDoc(callerCandidates, e.candidate.toJSON()).catch(err => console.error("candidate write failed:", err)); };
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -149,7 +149,7 @@ function handleIncomingCall(callId, data) {
       attachRemoteTrack();
 
       const calleeCandidates = collection(callRef, "calleeCandidates");
-      pc.onicecandidate = (e) => { if (e.candidate) addDoc(calleeCandidates, e.candidate.toJSON()); };
+      pc.onicecandidate = (e) => { if (e.candidate) addDoc(calleeCandidates, e.candidate.toJSON()).catch(err => console.error("candidate write failed:", err)); };
 
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
       const answer = await pc.createAnswer();
