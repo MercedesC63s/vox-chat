@@ -48,6 +48,7 @@ document.getElementById("form-signup").addEventListener("submit", async (e) => {
       await setDoc(doc(db, "users", cred.user.uid), {
         uid: cred.user.uid,
         displayName: name,
+        displayNameLower: name.toLowerCase(),
         email: email.toLowerCase(),
         createdAt: serverTimestamp(),
         status: "online",
