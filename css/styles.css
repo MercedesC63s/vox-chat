@@ -90,13 +90,26 @@ input:focus-visible, button:focus-visible{
 
 /* ---------------- App shell ---------------- */
 #screen-app.active{ display:flex; }
-.app-shell{ display:flex; height:100%; width:100%; }
+.app-shell{ display:flex; height:100%; width:100%; position:relative; overflow:hidden; }
 
 .sidebar{
   width: 300px; flex-shrink:0; border-right: 1px solid var(--border);
   display:flex; flex-direction:column; padding: 18px 14px;
   gap: 14px; background: var(--panel);
+  position:absolute; inset: 0 auto 0 0; height:100%; z-index: 40;
+  transform: translateX(-100%); transition: transform .22s var(--ease);
 }
+.app-shell.sidebar-open .sidebar{ transform: translateX(0); }
+
+.sidebar-backdrop{
+  position:absolute; inset:0; background: rgba(0,0,0,.5); z-index:30;
+  opacity:0; pointer-events:none; transition: opacity .2s var(--ease);
+}
+.app-shell.sidebar-open .sidebar-backdrop{ opacity:1; pointer-events:auto; }
+
+.btn-menu{ margin-right: 4px; }
+.btn-menu-empty{ position:absolute; top:16px; left:20px; }
+
 .sidebar-header{ display:flex; align-items:center; justify-content:space-between; }
 .me{ display:flex; align-items:center; gap:8px; font-size: 14px; font-weight:600; }
 .dot{ width:7px; height:7px; border-radius:50%; background: var(--text-faint); flex-shrink:0; }
@@ -104,11 +117,11 @@ input:focus-visible, button:focus-visible{
 .icon-btn{
   width:32px; height:32px; border-radius:50%; border: 1px solid var(--border);
   background:none; color: var(--text-dim); cursor:pointer; font-size:14px;
-  display:flex; align-items:center; justify-content:center;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
   transition: border-color .15s var(--ease), color .15s var(--ease);
 }
 .icon-btn:hover{ border-color: var(--white); color: var(--white); }
-.icon-btn-call{ font-size:18px; }
+.icon-btn-call{ font-size:16px; }
 
 .chat-list{ overflow-y:auto; display:flex; flex-direction:column; gap:2px; flex:1; }
 .chat-item{
@@ -127,20 +140,21 @@ input:focus-visible, button:focus-visible{
 .chat-item-preview{ font-size:12px; color: var(--text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 /* ---------------- Chat pane ---------------- */
-.chat-pane{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.chat-pane{ flex:1; display:flex; flex-direction:column; min-width:0; width:100%; }
 .chat-empty{
   flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  color: var(--text-faint); gap:18px; font-size:13px;
+  color: var(--text-faint); gap:18px; font-size:13px; position:relative;
 }
 .empty-placeholder{ display:flex; flex-direction:column; align-items:center; gap:16px; }
 .empty-placeholder .btn-primary{ padding: 10px 20px; }
 .btn-cancel-new-chat{ display:block; margin: 14px auto 0; }
 .chat-active{ flex:1; display:flex; flex-direction:column; min-height:0; }
-
-.peer-info{ 
-  display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px;
-  padding: 12px 24px; border-bottom:1px solid var(--border);
+.chat-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 16px 24px; border-bottom:1px solid var(--border);
 }
+.chat-header-left{ display:flex; align-items:center; }
+.peer-info{ display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px; }
 
 .messages{ flex:1; overflow-y:auto; padding: 20px 24px; display:flex; flex-direction:column; gap:10px; }
 .msg{
@@ -172,20 +186,8 @@ input:focus-visible, button:focus-visible{
   font-family: var(--font-display); font-weight:700; font-size:16px; letter-spacing:-0.03em;
 }
 
-/* ---------------- Inline new-conversation panel (modal overlay) ---------------- */
-.new-chat-panel{ 
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 24px;
-  z-index: 150;
-  max-width: 90%;
-  width: 400px;
-}
+/* ---------------- Inline new-conversation panel ---------------- */
+.new-chat-panel{ width: 300px; text-align:center; }
 .new-chat-panel h3{ font-family: var(--font-display); font-size:17px; margin:0 0 4px; color: var(--text); }
 .panel-sub{ color: var(--text-faint); font-size:12.5px; margin: 0 0 16px; }
 .panel-row{ display:flex; gap:8px; }
@@ -195,15 +197,15 @@ input:focus-visible, button:focus-visible{
 }
 .panel-row .btn-primary{ margin:0; padding: 0 18px; white-space:nowrap; }
 .new-chat-panel .auth-error{ margin-top:10px; }
-
-/* Overlay for modal */
-.chat-empty.new-chat-panel-open::before{
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.5);
-  z-index: 100;
+.new-chat-matches{ display:flex; flex-direction:column; gap:4px; margin-top:10px; text-align:left; }
+.match-row{
+  display:flex; align-items:center; gap:10px; padding:8px; border-radius: var(--radius-sm);
+  border:1px solid var(--border); background: var(--panel-2); cursor:pointer; transition: border-color .15s var(--ease);
 }
+.match-row:hover{ border-color: var(--white); }
+.match-row .n{ font-size:13px; font-weight:500; }
+.match-row .e{ font-size:11px; color: var(--text-faint); }
+
 
 /* ---------------- Calling screens (signature element) ---------------- */
 .call-screen{
@@ -333,7 +335,18 @@ input:focus-visible, button:focus-visible{
 
 /* ---------------- Responsive ---------------- */
 @media (max-width: 760px){
-  .sidebar{ width: 100%; position:absolute; inset:0; z-index:10; }
-  .app-shell.chat-open .sidebar{ display:none; }
-  .chat-pane{ width:100%; }
+  .sidebar{ width: 84%; max-width: 320px; }
+  .call-actions-active{ gap:12px; }
+  .call-btn-secondary{ width:46px; height:46px; font-size:14px; }
 }
+
+/* ---------------- Toast (visible error surface) ---------------- */
+.vox-toast{
+  position:fixed; bottom: 24px; left:50%; transform: translateX(-50%) translateY(20px);
+  background: var(--panel); border:1px solid var(--border); color: var(--text);
+  padding: 12px 18px; border-radius: var(--radius-sm); font-size:13px; max-width: 420px;
+  opacity:0; pointer-events:none; transition: opacity .2s var(--ease), transform .2s var(--ease);
+  z-index: 500; box-shadow: 0 8px 30px rgba(0,0,0,.4);
+}
+.vox-toast-visible{ opacity:1; transform: translateX(-50%) translateY(0); }
+.vox-toast-error{ border-color:#e5484d; color:#ff8a8a; }
