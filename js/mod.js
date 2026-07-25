@@ -1,92 +1,79 @@
 import { db } from "./firebase-config.js";
 import { state } from "./state.js";
-import { initials, escapeHtml, renderBadge } from "./app.js";
+import { initials, escapeHtml, closeDrawer } from "./app.js";
 import {
-  collection, query, onSnapshot, updateDoc, doc, where, getDocs
+  collection, doc, onSnapshot, updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const modScreen = document.getElementById("screen-mod");
-const modUserList = document.getElementById("mod-user-list");
+const screenMod = document.getElementById("screen-mod");
+const listEl = document.getElementById("mod-user-list");
+let unsubUsers = null;
 
-export function openModMenu() {
-  modScreen.hidden = false;
-  loadModUserList();
-}
+document.getElementById("btn-mod-menu").addEventListener("click", () => {
+  closeDrawer();
+  screenMod.hidden = false;
+  screenMod.classList.add("active");
+  if (!unsubUsers) {
+    unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      renderUserList(snap.docs.map(d => d.data()));
+    });
+  }
+});
 
-function closeModMenu() {
-  modScreen.hidden = true;
-}
+document.getElementById("btn-close-mod").addEventListener("click", () => {
+  screenMod.hidden = true;
+  screenMod.classList.remove("active");
+});
 
-function loadModUserList() {
-  const q = query(collection(db, "users"));
-  const unsubscribe = onSnapshot(q, (snap) => {
-    modUserList.innerHTML = "";
-    snap.forEach((docSnap) => {
-      const user = docSnap.data();
+function renderUserList(users) {
+  const iAmOwner = state.profile.role === "owner";
+  listEl.innerHTML = "";
+
+  users
+    .sort((a, b) => (a.displayName || "").localeCompare(b.displayName || ""))
+    .forEach((u) => {
+      const isSelf = u.uid === state.user.uid;
+      const targetIsOwner = u.role === "owner";
+      // Admins (non-owners) can't touch an owner's row, and can't grant owner.
+      const locked = targetIsOwner && !iAmOwner;
+
       const row = document.createElement("div");
       row.className = "mod-row";
       row.innerHTML = `
-        <div class="chat-avatar">${initials(user.displayName)}</div>
+        <div class="chat-avatar">${initials(u.displayName)}</div>
         <div class="mod-row-name">
-          <div class="n">${escapeHtml(user.displayName)}</div>
-          <div class="e">${escapeHtml(user.email)}</div>
+          <div class="n">${escapeHtml(u.displayName || "—")}${isSelf ? " (you)" : ""}</div>
+          <div class="e">${escapeHtml(u.email || "")}</div>
         </div>
-        <select class="mod-role-select" data-uid="${user.uid}">
-          <option value="member" ${user.role === "member" ? "selected" : ""}>Member</option>
-          <option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option>
-          <option value="owner" ${user.role === "owner" ? "selected" : ""}>Owner</option>
+        <input class="mod-tag-input" type="text" maxlength="12" placeholder="tag" value="${escapeHtml(u.tag || "")}" ${locked ? "disabled" : ""} />
+        <select class="mod-role-select" ${locked || isSelf ? "disabled" : ""}>
+          <option value="member" ${u.role === "member" || !u.role ? "selected" : ""}>member</option>
+          <option value="admin" ${u.role === "admin" ? "selected" : ""}>admin</option>
+          ${iAmOwner ? `<option value="owner" ${u.role === "owner" ? "selected" : ""}>owner</option>` : ""}
         </select>
-        <input type="text" class="mod-tag-input" data-uid="${user.uid}" value="${escapeHtml(user.tag || "")}" placeholder="Custom tag" />
-        <button class="mod-ban-btn ${user.banned ? "is-banned" : ""}" data-uid="${user.uid}" data-banned="${user.banned}">
-          ${user.banned ? "Unban" : "Ban"}
+        <button class="mod-ban-btn ${u.banned ? "is-banned" : ""}" ${locked || isSelf ? "disabled" : ""}>
+          ${u.banned ? "Unban" : "Ban"}
         </button>
       `;
 
-      // Role change
-      row.querySelector(".mod-role-select").addEventListener("change", async (e) => {
-        try {
-          await updateDoc(doc(db, "users", user.uid), { role: e.target.value });
-        } catch (err) {
-          console.error("Failed to update role:", err);
-        }
+      const tagInput = row.querySelector(".mod-tag-input");
+      tagInput.addEventListener("change", () => {
+        updateDoc(doc(db, "users", u.uid), { tag: tagInput.value.trim() })
+          .catch(err => console.error("tag update failed:", err));
       });
 
-      // Tag change
-      row.querySelector(".mod-tag-input").addEventListener("blur", async (e) => {
-        try {
-          await updateDoc(doc(db, "users", user.uid), { tag: e.target.value });
-        } catch (err) {
-          console.error("Failed to update tag:", err);
-        }
+      const roleSelect = row.querySelector(".mod-role-select");
+      roleSelect.addEventListener("change", () => {
+        updateDoc(doc(db, "users", u.uid), { role: roleSelect.value })
+          .catch(err => console.error("role update failed:", err));
       });
 
-      // Ban toggle
-      row.querySelector(".mod-ban-btn").addEventListener("click", async (e) => {
-        try {
-          await updateDoc(doc(db, "users", user.uid), { banned: !user.banned });
-        } catch (err) {
-          console.error("Failed to update ban status:", err);
-        }
+      const banBtn = row.querySelector(".mod-ban-btn");
+      banBtn.addEventListener("click", () => {
+        updateDoc(doc(db, "users", u.uid), { banned: !u.banned })
+          .catch(err => console.error("ban update failed:", err));
       });
 
-      modUserList.appendChild(row);
+      listEl.appendChild(row);
     });
-  }, (error) => {
-    console.error("Failed to load mod user list:", error);
-    modUserList.innerHTML = "<p>Error loading users</p>";
-  });
-
-  return unsubscribe;
-}
-
-// Attach event listeners
-const btnModMenu = document.getElementById("btn-mod-menu");
-const btnCloseMod = document.getElementById("btn-close-mod");
-
-if (btnModMenu) {
-  btnModMenu.addEventListener("click", openModMenu);
-}
-
-if (btnCloseMod) {
-  btnCloseMod.addEventListener("click", closeModMenu);
 }
