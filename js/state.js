@@ -6,4 +6,5 @@ export const state = {
   activeChatId: null,
   activePeer: null,     // { uid, displayName, email }
   unsubMessages: null,  // firestore listener teardown for current chat
+  unsubPeerDoc: null,    // firestore listener teardown for the open peer's live profile (badge/status)
 };
