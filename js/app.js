@@ -28,14 +28,8 @@ export function renderBadge(profile) {
   return html;
 }
 
-// ---- sidebar drawer (single-page feel: hidden until opened) ----
-const appShell = document.querySelector(".app-shell");
-export function openDrawer() { appShell?.classList.add("sidebar-open"); }
-export function closeDrawer() { appShell?.classList.remove("sidebar-open"); }
-document.getElementById("btn-menu-chat").addEventListener("click", openDrawer);
-document.getElementById("btn-menu-empty").addEventListener("click", openDrawer);
-document.getElementById("sidebar-backdrop").addEventListener("click", closeDrawer);
-
+// ---- auth state — this MUST register early and MUST NOT depend on any
+// later code succeeding, since it's what actually logs you in/out ----
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     state.user = user;
@@ -71,18 +65,21 @@ onAuthStateChanged(auth, async (user) => {
       console.error("Could not load/create profile doc — check that Firestore rules are published:", err);
     }
 
-    document.getElementById("me-name").textContent = state.profile.displayName || "you";
-    document.getElementById("me-badge").innerHTML = renderBadge(state.profile);
+    const meName = document.getElementById("me-name");
+    if (meName) meName.textContent = state.profile.displayName || "you";
+    const meBadge = document.getElementById("me-badge");
+    if (meBadge) meBadge.innerHTML = renderBadge(state.profile);
 
     if (state.profile.banned) {
       screenAuth.classList.remove("active");
       screenApp.classList.remove("active");
-      document.getElementById("screen-banned").classList.add("active");
+      document.getElementById("screen-banned")?.classList.add("active");
       return;
     }
-    document.getElementById("screen-banned").classList.remove("active");
+    document.getElementById("screen-banned")?.classList.remove("active");
 
-    document.getElementById("btn-mod-menu").hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
+    const modBtn = document.getElementById("btn-mod-menu");
+    if (modBtn) modBtn.hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
 
     updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
 
@@ -98,6 +95,16 @@ onAuthStateChanged(auth, async (user) => {
     screenAuth.classList.add("active");
   }
 });
+
+// ---- sidebar drawer (single-page feel: hidden until opened) ----
+// Every lookup below is null-safe (?.) on purpose: a missing button here
+// should never be able to take down the rest of the app.
+const appShell = document.querySelector(".app-shell");
+export function openDrawer() { appShell?.classList.add("sidebar-open"); }
+export function closeDrawer() { appShell?.classList.remove("sidebar-open"); }
+document.getElementById("btn-menu-chat")?.addEventListener("click", openDrawer);
+document.getElementById("btn-menu-empty")?.addEventListener("click", openDrawer);
+document.getElementById("sidebar-backdrop")?.addEventListener("click", closeDrawer);
 
 // ---- chat list ----
 let hasAutoOpenedAChat = false;
@@ -189,17 +196,17 @@ function showNewChatPanel() {
 }
 
 // Sidebar's "+ New conversation" — return to the empty screen, panel open.
-document.getElementById("btn-new-chat").addEventListener("click", () => {
+document.getElementById("btn-new-chat")?.addEventListener("click", () => {
   goToEmptyScreen();
   showNewChatPanel();
   closeDrawer();
 });
 
 // "+ Add friend" on the empty screen itself — just reveal the panel.
-document.getElementById("btn-show-new-chat").addEventListener("click", showNewChatPanel);
+document.getElementById("btn-show-new-chat")?.addEventListener("click", showNewChatPanel);
 
 // Cancel — back to the placeholder.
-document.getElementById("btn-cancel-new-chat").addEventListener("click", showPlaceholder);
+document.getElementById("btn-cancel-new-chat")?.addEventListener("click", showPlaceholder);
 
 async function beginChatWith(peer) {
   const chatId = [state.user.uid, peer.uid].sort().join("_");
@@ -269,5 +276,5 @@ async function startConversation() {
   }
 }
 
-startBtn.addEventListener("click", startConversation);
-nameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") startConversation(); });
+startBtn?.addEventListener("click", startConversation);
+nameInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") startConversation(); });
