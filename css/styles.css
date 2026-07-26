@@ -268,7 +268,7 @@ input:focus-visible, button:focus-visible{
 .call-btn{
   width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
   font-size:20px; display:flex; align-items:center; justify-content:center;
-  transition: transform .12s var(--ease), opacity .12s var(--ease);
+  transition: transform .12s var(--ease), opacity .12s var(--ease), background .12s var(--ease);
 }
 .call-btn:active{ transform: scale(.94); }
 .call-btn-accept{ background: var(--white); color:#0a0a0a; }
@@ -278,6 +278,14 @@ input:focus-visible, button:focus-visible{
 }
 .call-btn-secondary.is-on{ background: var(--white); color:#0a0a0a; }
 .call-actions-active{ gap:22px; }
+
+/* Mute/camera-off slash overlay: hidden by default, revealed by JS toggling
+   is-on on the button (svg inherits color via currentColor automatically). */
+.icon-slash{ opacity:0; transition: opacity .1s var(--ease); }
+.call-btn-secondary.is-on .icon-slash{ opacity:1; }
+
+/* All icon-only buttons: make sure the SVG centers regardless of button font-size */
+.icon-btn svg, .call-btn svg{ display:block; }
 
 /* ---------------- Badges (role + custom tag) ---------------- */
 .badge{
