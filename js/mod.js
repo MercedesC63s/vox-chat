@@ -49,6 +49,7 @@ function renderUserList(users) {
         <select class="mod-role-select" ${locked || isSelf ? "disabled" : ""}>
           <option value="member" ${u.role === "member" || !u.role ? "selected" : ""}>member</option>
           <option value="admin" ${u.role === "admin" ? "selected" : ""}>admin</option>
+          ${iAmOwner ? `<option value="co-owner" ${u.role === "co-owner" ? "selected" : ""}>co-owner</option>` : ""}
           ${iAmOwner ? `<option value="owner" ${u.role === "owner" ? "selected" : ""}>owner</option>` : ""}
         </select>
         <button class="mod-ban-btn ${u.banned === true ? "is-banned" : ""}" ${locked || isSelf ? "disabled" : ""}>
