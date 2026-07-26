@@ -130,8 +130,10 @@ function listenToChats() {
     let firstChat = null;
     snap.forEach((docSnap) => {
       const chat = docSnap.data();
-      const peer = chat.participantInfo?.[state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0]];
-      if (!peer) return;
+      const peerUid = state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0];
+      const peerInfo = chat.participantInfo?.[peerUid];
+      if (!peerInfo) return;
+      const peer = { ...peerInfo, uid: peerUid };
       if (!firstChat) firstChat = { id: docSnap.id, peer };
       const item = document.createElement("div");
       item.className = "chat-item" + (state.activeChatId === docSnap.id ? " active" : "");
