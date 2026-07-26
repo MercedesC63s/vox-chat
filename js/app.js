@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   doc, setDoc, getDoc, updateDoc, collection, query, where,
-  onSnapshot, serverTimestamp, getDocs
+  onSnapshot, serverTimestamp, getDocs, addDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { openChat } from "./chat.js";
 import { listenForIncomingCalls } from "./call.js";
@@ -24,6 +24,7 @@ export function renderBadge(profile) {
   if (!profile) return "";
   let html = "";
   if (profile.role === "owner") html += `<span class="badge badge-owner">owner</span>`;
+  else if (profile.role === "co-owner") html += `<span class="badge badge-coowner">co-owner</span>`;
   else if (profile.role === "admin") html += `<span class="badge badge-admin">admin</span>`;
   if (profile.tag) html += `<span class="badge badge-tag">${escapeHtml(profile.tag)}</span>`;
   return html;
@@ -80,7 +81,14 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("screen-banned")?.classList.remove("active");
 
     const modBtn = document.getElementById("btn-mod-menu");
-    if (modBtn) modBtn.hidden = !(state.profile.role === "owner" || state.profile.role === "admin");
+    if (modBtn) modBtn.hidden = !["owner", "co-owner", "admin"].includes(state.profile.role);
+
+    state.schoolMode = state.profile.schoolMode === true;
+    const schoolBtn = document.getElementById("btn-school-mode");
+    if (schoolBtn) {
+      schoolBtn.classList.toggle("is-on", state.schoolMode);
+      schoolBtn.title = state.schoolMode ? "School mode: on (calls silent)" : "School mode: off";
+    }
 
     updateDoc(doc(db, "users", user.uid), { status: "online" }).catch((err) => console.error("status update failed:", err));
 
@@ -94,6 +102,18 @@ onAuthStateChanged(auth, async (user) => {
     state.profile = null;
     screenApp.classList.remove("active");
     screenAuth.classList.add("active");
+  }
+});
+
+document.getElementById("btn-school-mode")?.addEventListener("click", async (e) => {
+  state.schoolMode = !state.schoolMode;
+  e.currentTarget.classList.toggle("is-on", state.schoolMode);
+  e.currentTarget.title = state.schoolMode ? "School mode: on (calls silent)" : "School mode: off";
+  try {
+    await updateDoc(doc(db, "users", state.user.uid), { schoolMode: state.schoolMode });
+  } catch (err) {
+    console.error("School mode toggle failed to save:", err);
+    showToast("School mode setting didn't save — try again.");
   }
 });
 
@@ -130,10 +150,15 @@ function listenToChats() {
     let firstChat = null;
     snap.forEach((docSnap) => {
       const chat = docSnap.data();
-      const peerUid = state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0];
-      const peerInfo = chat.participantInfo?.[peerUid];
-      if (!peerInfo) return;
-      const peer = { ...peerInfo, uid: peerUid };
+      let peer;
+      if (chat.isGroup) {
+        peer = { displayName: chat.groupName || "Group", isGroup: true, participantInfo: chat.participantInfo || {} };
+      } else {
+        const peerUid = state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0];
+        const peerInfo = chat.participantInfo?.[peerUid];
+        if (!peerInfo) return;
+        peer = { ...peerInfo, uid: peerUid };
+      }
       if (!firstChat) firstChat = { id: docSnap.id, peer };
       const item = document.createElement("div");
       item.className = "chat-item" + (state.activeChatId === docSnap.id ? " active" : "");
@@ -182,6 +207,7 @@ function goToEmptyScreen() {
   document.getElementById("chat-empty").hidden = false;
   document.querySelector(".app-shell")?.classList.remove("chat-open");
   document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
+  document.getElementById("new-group-panel")?.setAttribute("hidden", "");
   showPlaceholder();
 }
 
@@ -281,3 +307,115 @@ async function startConversation() {
 
 startBtn?.addEventListener("click", startConversation);
 nameInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") startConversation(); });
+
+// ---- new group ----
+const groupNameInput = document.getElementById("new-group-name");
+const groupMemberInput = document.getElementById("new-group-member-name");
+const groupErrEl = document.getElementById("new-group-error");
+const groupMatchesEl = document.getElementById("new-group-matches");
+const groupMembersEl = document.getElementById("new-group-members");
+const newGroupPanel = document.getElementById("new-group-panel");
+let pendingGroupMembers = []; // [{uid, displayName, email}]
+
+document.getElementById("btn-new-group")?.addEventListener("click", () => {
+  goToEmptyScreen();
+  if (newChatPanel) newChatPanel.hidden = true;
+  if (newGroupPanel) newGroupPanel.hidden = false;
+  pendingGroupMembers = [];
+  groupNameInput.value = "";
+  groupMemberInput.value = "";
+  groupErrEl.textContent = "";
+  groupMatchesEl.innerHTML = "";
+  renderGroupMemberChips();
+});
+
+document.getElementById("btn-cancel-new-group")?.addEventListener("click", () => {
+  if (newGroupPanel) newGroupPanel.hidden = true;
+});
+
+function renderGroupMemberChips() {
+  groupMembersEl.innerHTML = pendingGroupMembers.map((m, i) => `
+    <div class="match-row">
+      <div class="chat-avatar">${initials(m.displayName)}</div>
+      <div style="flex:1"><div class="n">${escapeHtml(m.displayName)}</div><div class="e">${escapeHtml(m.email || "")}</div></div>
+      <button type="button" class="btn-ghost" data-remove-idx="${i}" style="padding:4px 10px;">Remove</button>
+    </div>`).join("");
+  groupMembersEl.querySelectorAll("[data-remove-idx]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      pendingGroupMembers.splice(Number(btn.dataset.removeIdx), 1);
+      renderGroupMemberChips();
+    });
+  });
+}
+
+document.getElementById("btn-add-group-member")?.addEventListener("click", async () => {
+  const name = groupMemberInput.value.trim();
+  groupErrEl.textContent = "";
+  groupMatchesEl.innerHTML = "";
+  if (!name) { groupErrEl.textContent = "Enter a display name first."; return; }
+
+  try {
+    const usersQ = query(collection(db, "users"), where("displayNameLower", "==", name.toLowerCase()));
+    const usersSnap = await getDocs(usersQ);
+    const matches = usersSnap.docs.map(d => d.data())
+      .filter(u => u.uid !== state.user.uid && !pendingGroupMembers.some(m => m.uid === u.uid));
+
+    if (matches.length === 0) { groupErrEl.textContent = "No new match with that name."; return; }
+
+    if (matches.length === 1) {
+      pendingGroupMembers.push(matches[0]);
+      groupMemberInput.value = "";
+      renderGroupMemberChips();
+      return;
+    }
+    // Multiple accounts share this name — let the user pick which to add.
+    matches.forEach((u) => {
+      const row = document.createElement("div");
+      row.className = "match-row";
+      row.innerHTML = `<div class="chat-avatar">${initials(u.displayName)}</div>
+        <div><div class="n">${escapeHtml(u.displayName)}</div><div class="e">${escapeHtml(u.email || "")}</div></div>`;
+      row.addEventListener("click", () => {
+        pendingGroupMembers.push(u);
+        groupMemberInput.value = "";
+        groupMatchesEl.innerHTML = "";
+        renderGroupMemberChips();
+      });
+      groupMatchesEl.appendChild(row);
+    });
+  } catch (err) {
+    console.error("Group member search failed:", err);
+    groupErrEl.textContent = "Something went wrong — check the console.";
+  }
+});
+
+document.getElementById("btn-create-group")?.addEventListener("click", async () => {
+  groupErrEl.textContent = "";
+  if (pendingGroupMembers.length < 2) {
+    groupErrEl.textContent = "Add at least 2 friends for a group.";
+    return;
+  }
+  const groupName = groupNameInput.value.trim() ||
+    pendingGroupMembers.map(m => m.displayName).slice(0, 3).join(", ");
+
+  try {
+    const participantInfo = {
+      [state.user.uid]: { displayName: state.profile.displayName, email: state.profile.email }
+    };
+    pendingGroupMembers.forEach(m => { participantInfo[m.uid] = { displayName: m.displayName, email: m.email }; });
+
+    const chatRef = await addDoc(collection(db, "chats"), {
+      participants: [state.user.uid, ...pendingGroupMembers.map(m => m.uid)],
+      participantInfo,
+      isGroup: true,
+      groupName,
+      createdAt: serverTimestamp(),
+      lastMessage: ""
+    });
+
+    if (newGroupPanel) newGroupPanel.hidden = true;
+    openChat(chatRef.id, { displayName: groupName, isGroup: true, participantInfo });
+  } catch (err) {
+    console.error("Group creation failed:", err);
+    groupErrEl.textContent = "Something went wrong — check the console.";
+  }
+});
