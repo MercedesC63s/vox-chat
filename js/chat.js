@@ -30,19 +30,25 @@ export function openChat(chatId, peer) {
   });
 
   const q = query(collection(db, "chats", chatId, "messages"), orderBy("clientTime", "asc"));
-  state.unsubMessages = onSnapshot(q, (snap) => {
-    messagesEl.innerHTML = "";
-    snap.forEach((docSnap) => {
-      const m = docSnap.data();
-      const mine = m.senderId === state.user.uid;
-      const time = m.clientTime ? new Date(m.clientTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-      const bubble = document.createElement("div");
-      bubble.className = "msg " + (mine ? "msg-mine" : "msg-theirs");
-      bubble.innerHTML = `${escapeHtml(m.text)}<span class="msg-time">${time}</span>`;
-      messagesEl.appendChild(bubble);
-    });
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  });
+  state.unsubMessages = onSnapshot(q,
+    (snap) => {
+      messagesEl.innerHTML = "";
+      snap.forEach((docSnap) => {
+        const m = docSnap.data();
+        const mine = m.senderId === state.user.uid;
+        const time = m.clientTime ? new Date(m.clientTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+        const bubble = document.createElement("div");
+        bubble.className = "msg " + (mine ? "msg-mine" : "msg-theirs");
+        bubble.innerHTML = `${escapeHtml(m.text)}<span class="msg-time">${time}</span>`;
+        messagesEl.appendChild(bubble);
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    },
+    (err) => {
+      console.error("Messages listener failed:", err);
+      showToast(`Can't load messages: ${err.code || err.message || "unknown error"}`);
+    }
+  );
 }
 
 document.getElementById("form-message").addEventListener("submit", async (e) => {
