@@ -51,8 +51,8 @@ function renderUserList(users) {
           <option value="admin" ${u.role === "admin" ? "selected" : ""}>admin</option>
           ${iAmOwner ? `<option value="owner" ${u.role === "owner" ? "selected" : ""}>owner</option>` : ""}
         </select>
-        <button class="mod-ban-btn ${u.banned ? "is-banned" : ""}" ${locked || isSelf ? "disabled" : ""}>
-          ${u.banned ? "Unban" : "Ban"}
+        <button class="mod-ban-btn ${u.banned === true ? "is-banned" : ""}" ${locked || isSelf ? "disabled" : ""}>
+          ${u.banned === true ? "Unban" : "Ban"}
         </button>
       `;
 
@@ -70,7 +70,7 @@ function renderUserList(users) {
 
       const banBtn = row.querySelector(".mod-ban-btn");
       banBtn.addEventListener("click", () => {
-        updateDoc(doc(db, "users", u.uid), { banned: !u.banned })
+        updateDoc(doc(db, "users", u.uid), { banned: !(u.banned === true) })
           .catch(err => console.error("ban update failed:", err));
       });
 
