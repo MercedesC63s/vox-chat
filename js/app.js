@@ -168,7 +168,6 @@ export function escapeHtml(str = "") {
 const nameInput = document.getElementById("new-chat-name");
 const errEl = document.getElementById("new-chat-error");
 const startBtn = document.getElementById("btn-confirm-new-chat");
-const emptyPlaceholder = document.getElementById("empty-placeholder");
 const newChatPanel = document.getElementById("new-chat-panel");
 const matchesEl = document.getElementById("new-chat-matches");
 
@@ -185,12 +184,11 @@ function goToEmptyScreen() {
 }
 
 function showPlaceholder() {
-  newChatPanel.hidden = true;
-  emptyPlaceholder.hidden = false;
+  if (newChatPanel) newChatPanel.hidden = true;
 }
 
 function showNewChatPanel() {
-  emptyPlaceholder.hidden = true;
+  if (!newChatPanel) return;
   newChatPanel.hidden = false;
   errEl.textContent = "";
   matchesEl.innerHTML = "";
