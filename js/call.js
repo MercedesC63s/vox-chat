@@ -129,7 +129,7 @@ function handleIncomingCall(callId, data) {
   document.getElementById("incoming-initial").textContent = initials(data.callerName);
   showScreen(screenIncoming);
   notify(`Incoming call — ${data.callerName || "Unknown"}`, "tap to open vox");
-  ringtone.startRingtone();
+  if (!state.schoolMode) ringtone.startRingtone();
 
   const callRef = doc(db, "calls", callId);
 
