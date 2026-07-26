@@ -8,6 +8,7 @@ import {
 import { openChat } from "./chat.js";
 import { listenForIncomingCalls } from "./call.js";
 import { requestNotificationPermission, notify } from "./notifications.js";
+import { showToast } from "./toast.js";
 
 const screenAuth = document.getElementById("screen-auth");
 const screenApp = document.getElementById("screen-app");
@@ -102,8 +103,7 @@ onAuthStateChanged(auth, async (user) => {
 const appShell = document.querySelector(".app-shell");
 export function openDrawer() { appShell?.classList.add("sidebar-open"); }
 export function closeDrawer() { appShell?.classList.remove("sidebar-open"); }
-document.getElementById("btn-menu-chat")?.addEventListener("click", openDrawer);
-document.getElementById("btn-menu-empty")?.addEventListener("click", openDrawer);
+document.getElementById("btn-menu")?.addEventListener("click", openDrawer);
 document.getElementById("sidebar-backdrop")?.addEventListener("click", closeDrawer);
 
 // ---- chat list ----
@@ -152,6 +152,9 @@ function listenToChats() {
       hasAutoOpenedAChat = true;
       openChat(firstChat.id, firstChat.peer);
     }
+  }, (err) => {
+    console.error("Chat list listener failed:", err);
+    showToast(`Can't load conversations: ${err.code || err.message || "unknown error"}`);
   });
 }
 
@@ -202,8 +205,8 @@ document.getElementById("btn-new-chat")?.addEventListener("click", () => {
   closeDrawer();
 });
 
-// "+ Add friend" on the empty screen itself — just reveal the panel.
-document.getElementById("btn-show-new-chat")?.addEventListener("click", showNewChatPanel);
+// "+ New conversation" in the drawer is now the only way to open this panel —
+// the old always-visible "Add friend" CTA on the empty screen was removed.
 
 // Cancel — back to the placeholder.
 document.getElementById("btn-cancel-new-chat")?.addEventListener("click", showPlaceholder);
