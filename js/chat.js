@@ -25,9 +25,14 @@ export function openChat(chatId, peer) {
   document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
 
   // Live badge (role/tag) so a ban, promotion, or tag change shows up immediately.
-  state.unsubPeerDoc = onSnapshot(doc(db, "users", peer.uid), (snap) => {
-    document.getElementById("peer-badge").innerHTML = snap.exists() ? renderBadge(snap.data()) : "";
-  });
+  // Guarded: this must never be able to block the messages listener below.
+  if (peer.uid) {
+    state.unsubPeerDoc = onSnapshot(doc(db, "users", peer.uid), (snap) => {
+      document.getElementById("peer-badge").innerHTML = snap.exists() ? renderBadge(snap.data()) : "";
+    }, (err) => console.error("Peer badge listener failed:", err));
+  } else {
+    console.error("openChat called without peer.uid — badge won't update live, but messages will still load.");
+  }
 
   const q = query(collection(db, "chats", chatId, "messages"), orderBy("clientTime", "asc"));
   state.unsubMessages = onSnapshot(q,
