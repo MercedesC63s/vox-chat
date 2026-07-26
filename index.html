@@ -86,14 +86,13 @@
 
     <!-- Main: active chat -->
     <main class="chat-pane">
+      <button id="btn-menu" class="icon-btn btn-menu btn-menu-floating" title="Menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+
       <div id="chat-empty" class="chat-empty">
-        <button id="btn-menu-empty" class="icon-btn btn-menu btn-menu-empty" title="Menu">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-        </button>
         <div id="empty-placeholder" class="empty-placeholder">
           <div class="ripple-mini"><span></span><span></span><span></span></div>
-          <p>Select a conversation, or add a friend to start one.</p>
-          <button id="btn-show-new-chat" class="btn-primary">+ Add friend</button>
         </div>
 
         <div id="new-chat-panel" class="new-chat-panel" hidden>
@@ -112,9 +111,6 @@
       <div id="chat-active" class="chat-active" hidden>
         <header class="chat-header">
           <div class="chat-header-left">
-            <button id="btn-menu-chat" class="icon-btn btn-menu" title="Menu">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-            </button>
             <div class="peer-info">
               <span class="dot" id="peer-status"></span>
               <span id="peer-name">—</span>
