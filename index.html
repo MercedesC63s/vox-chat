@@ -70,6 +70,9 @@
           <button id="btn-mod-menu" class="icon-btn" title="Mod menu" hidden>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V5l8-3z"/></svg>
           </button>
+          <button id="btn-school-mode" class="icon-btn" title="School mode: off">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10L12 5 2 10l10 5 10-5z"/><path d="M6 12.5V17c0 1.1 2.7 3 6 3s6-1.9 6-3v-4.5"/></svg>
+          </button>
           <button id="btn-logout" class="icon-btn" title="Log out">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
           </button>
@@ -77,6 +80,7 @@
       </div>
 
       <button id="btn-new-chat" class="btn-ghost">+ New conversation</button>
+      <button id="btn-new-group" class="btn-ghost">+ New group</button>
 
       <div id="chat-list" class="chat-list">
         <!-- populated by js -->
@@ -102,6 +106,25 @@
           <div id="new-chat-matches" class="new-chat-matches"></div>
           <button id="btn-cancel-new-chat" class="btn-ghost btn-cancel-new-chat">Cancel</button>
         </div>
+
+        <div id="new-group-panel" class="new-chat-panel" hidden>
+          <h3>New group</h3>
+          <p class="panel-sub">Add friends by display name, then create the group.</p>
+          <div class="panel-row">
+            <input type="text" id="new-group-name" placeholder="Group name" />
+          </div>
+          <div class="panel-row">
+            <input type="text" id="new-group-member-name" placeholder="Friend's display name" />
+            <button id="btn-add-group-member" class="btn-primary">Add</button>
+          </div>
+          <p class="auth-error" id="new-group-error"></p>
+          <div id="new-group-matches" class="new-chat-matches"></div>
+          <div id="new-group-members" class="new-chat-matches"></div>
+          <div class="panel-row">
+            <button id="btn-create-group" class="btn-primary">Create group</button>
+          </div>
+          <button id="btn-cancel-new-group" class="btn-ghost btn-cancel-new-chat">Cancel</button>
+        </div>
       </div>
 
       <div id="chat-active" class="chat-active" hidden>
@@ -122,9 +145,24 @@
 
         <div id="messages" class="messages"></div>
 
+        <div id="emoji-picker" class="emoji-picker" hidden></div>
+
         <form id="form-message" class="message-form">
+          <div class="attach-wrap">
+            <button type="button" id="btn-attach" class="icon-btn" title="Add">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div id="attach-menu" class="attach-menu" hidden>
+              <button type="button" id="btn-attach-emoji" class="attach-menu-item">😀 Emoji</button>
+              <button type="button" id="btn-attach-media" class="attach-menu-item">🖼️ Image / GIF / Video</button>
+              <button type="button" id="btn-attach-game" class="attach-menu-item">🎮 Play a game</button>
+            </div>
+          </div>
+          <input type="file" id="media-input" accept="image/*,video/*" hidden />
           <input type="text" id="message-input" placeholder="Message" autocomplete="off" />
-          <button type="submit" class="icon-btn">↑</button>
+          <button type="submit" class="icon-btn" title="Send">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          </button>
         </form>
       </div>
     </main>
@@ -205,6 +243,19 @@
   </div>
 </div>
 
+<!-- ================= GAME (Tic-Tac-Toe) ================= -->
+<div id="screen-game" class="screen mod-screen" hidden>
+  <div class="mod-card game-card">
+    <header class="mod-header">
+      <h2>Tic-Tac-Toe</h2>
+      <button id="btn-close-game" class="icon-btn" title="Close">✕</button>
+    </header>
+    <p class="panel-sub" id="game-status">—</p>
+    <div id="game-board" class="game-board"></div>
+    <button id="btn-game-restart" class="btn-ghost" style="margin-top:14px;">Restart</button>
+  </div>
+</div>
+
 <!-- ================= BANNED ================= -->
 <section id="screen-banned" class="screen banned-screen" hidden>
   <div class="banned-card">
@@ -223,5 +274,6 @@
 <script type="module" src="js/notifications.js"></script>
 <script type="module" src="js/toast.js"></script>
 <script type="module" src="js/ringtone.js"></script>
+<script type="module" src="js/game.js"></script>
 </body>
 </html>
