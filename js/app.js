@@ -71,7 +71,7 @@ onAuthStateChanged(auth, async (user) => {
     const meBadge = document.getElementById("me-badge");
     if (meBadge) meBadge.innerHTML = renderBadge(state.profile);
 
-    if (state.profile.banned) {
+    if (state.profile.banned === true) {
       screenAuth.classList.remove("active");
       screenApp.classList.remove("active");
       document.getElementById("screen-banned")?.classList.add("active");
