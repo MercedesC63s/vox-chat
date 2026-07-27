@@ -213,17 +213,26 @@ input:focus-visible, button:focus-visible{
 
 /* ---------------- Calling screens (signature element) ---------------- */
 .call-screen{
-  position:fixed; inset:0; background: var(--bg); z-index:100;
-  flex-direction:column; align-items:center; justify-content:space-between;
-  padding: 80px 0 60px; overflow:hidden;
+  position:fixed; inset:0; background: rgba(0,0,0,.72); z-index:100;
+  align-items:center; justify-content:center; padding: 20px;
 }
+.call-panel{
+  width: min(92vw, 380px); max-height: 86vh; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 28px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  display:flex; flex-direction:column; align-items:center; justify-content:space-between;
+  padding: 40px 0 28px; position:relative; overflow:hidden;
+}
+/* Round video "box" for a 1:1 call — takes the avatar's place in the
+   layout once connected, rather than covering the whole screen.
+   NOTE: group calls (3+ people) aren't implemented yet — see README —
+   this only ever shows one remote participant for now. */
 .remote-video{
-  position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
-  background: var(--bg); z-index:0;
+  width: 220px; height: 220px; border-radius: 50%; object-fit:cover;
+  background: var(--panel-2); z-index:2; border: 1px solid var(--border);
 }
 .remote-video.no-video{ display:none; }
 .local-video{
-  position:absolute; bottom: 130px; right: 24px; width: 110px; height: 150px;
+  position:absolute; bottom: 108px; right: 18px; width: 76px; height: 104px;
   object-fit:cover; border-radius: var(--radius-sm); border: 1px solid var(--border);
   z-index:3; background: var(--panel-2); transform: scaleX(-1);
 }
@@ -234,6 +243,23 @@ input:focus-visible, button:focus-visible{
 .call-body.video-active .call-name,
 .call-body.video-active .call-status,
 .call-body.video-active .call-timer{ text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+
+/* Scaffold for future group calls: a grid of individual "personal box"
+   tiles instead of one round video. Not wired up yet — group audio/video
+   calling (3+ people) needs its own signaling work first (see README). */
+.call-participants-grid{
+  display:grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap:8px; width:100%; padding: 0 20px;
+}
+.call-tile{
+  aspect-ratio: 1; border-radius: 14px; background: var(--panel-2);
+  border:1px solid var(--border); overflow:hidden; position:relative;
+}
+.call-tile video{ width:100%; height:100%; object-fit:cover; }
+.call-tile .call-tile-name{
+  position:absolute; bottom:4px; left:6px; font-size:10px; color:#fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
 
 .call-avatar{
   width:104px; height:104px; border-radius:50%; background: var(--panel-2);
@@ -414,3 +440,57 @@ input:focus-visible, button:focus-visible{
   background: rgba(0,0,0,.6); border:1px solid var(--border); padding:6px 12px;
   border-radius: 999px; z-index:2;
 }
+
+/* ---------------- Notification center ---------------- */
+.notif-wrap{ position:relative; }
+.notif-dot{
+  position:absolute; top:-2px; right:-2px; width:8px; height:8px;
+  border-radius:50%; background:#e5484d; border:1.5px solid var(--panel);
+}
+.notif-panel{
+  position:absolute; top:40px; left:0; width: 280px; max-height: 360px;
+  display:flex; flex-direction:column; padding:0;
+}
+.notif-panel-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px; border-bottom:1px solid var(--border); font-size:12.5px; font-weight:600;
+}
+.notif-list{ overflow-y:auto; max-height:300px; }
+.notif-row{ padding:10px 12px; border-bottom:1px solid var(--border); }
+.notif-row:last-child{ border-bottom:none; }
+.notif-title{ font-size:12.5px; font-weight:600; }
+.notif-body{ font-size:12px; color: var(--text-dim); margin-top:2px; }
+.notif-time{ font-family: var(--font-mono); font-size:10px; color: var(--text-faint); margin-top:4px; }
+
+/* ---------------- Typing indicator ---------------- */
+.typing-indicator{
+  padding: 0 24px 8px; font-size:12px; color: var(--text-faint); font-style:italic;
+}
+
+/* ---------------- Message actions / reactions / editing ---------------- */
+.msg{ position:relative; }
+.msg-actions{
+  display:flex; gap:4px; margin-top:4px; opacity:0; transition: opacity .12s var(--ease);
+}
+.msg:hover .msg-actions{ opacity:1; }
+.msg-action-btn{
+  background:none; border:none; cursor:pointer; font-size:12px; padding:2px 4px;
+  border-radius:4px; opacity:.7;
+}
+.msg-action-btn:hover{ opacity:1; background: rgba(255,255,255,.1); }
+.msg-deleted{ color: var(--text-faint); font-style:italic; }
+.msg-edited{ font-size:10px; opacity:.5; margin-left:4px; }
+.msg-reactions{ display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+.msg-reaction-pill{
+  background: rgba(255,255,255,.08); border:1px solid var(--border); border-radius:999px;
+  font-size:11px; padding:2px 8px; cursor:pointer; color:inherit;
+}
+.msg-reaction-pill.mine{ border-color: var(--white); }
+.msg-edit-row{ display:flex; gap:6px; align-items:center; }
+.msg-edit-input{
+  flex:1; background: rgba(255,255,255,.1); border:1px solid var(--border); border-radius:6px;
+  padding:5px 8px; color:inherit; font-size:13.5px;
+}
+.msg-mine .msg-edit-input{ color:#0a0a0a; background: rgba(0,0,0,.08); }
+.msg-edit-row .btn-ghost{ padding:4px 8px; font-size:11px; }
+.chat-header-right{ display:flex; gap:8px; }
