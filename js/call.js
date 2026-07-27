@@ -25,6 +25,8 @@ let timerInterval = null;
 let isMuted = false;
 let isOnHold = false;
 let isCameraOff = false;
+let isBlackedOut = false;
+let blackTrack = null;
 
 const screenIncoming = document.getElementById("screen-incoming");
 const screenCall = document.getElementById("screen-call");
@@ -100,6 +102,7 @@ async function startCall() {
         startTimer();
         listenForCandidates(callRef, "calleeCandidates");
       }
+      updatePrivacyNotice(data);
       if (data.status === "declined") { ringtone.stop(); endCall("declined"); }
       if (data.status === "ended") { ringtone.stop(); endCall(); }
     });
@@ -167,6 +170,7 @@ function handleIncomingCall(callId, data) {
 
       unsubCallDoc = onSnapshot(callRef, (snap) => {
         const d = snap.data();
+        if (d) updatePrivacyNotice(d);
         if (d?.status === "ended") endCall();
       });
     } catch (err) {
@@ -211,6 +215,11 @@ function showCallScreen(screenEl, name, status) {
   callBody.classList.remove("video-active");
   remoteVideo.classList.add("no-video");
   showScreen(screenEl);
+}
+
+function updatePrivacyNotice(data) {
+  const notice = document.getElementById("call-privacy-notice");
+  if (notice) notice.hidden = !data.sharePrivacy;
 }
 
 function startTimer() {
@@ -316,7 +325,7 @@ async function endCall(reason) {
   if (pc) { pc.close(); pc = null; }
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-  isMuted = false; isOnHold = false; isCameraOff = false; isScreenSharing = false;
+  isMuted = false; isOnHold = false; isCameraOff = false; isScreenSharing = false; isBlackedOut = false;
   document.getElementById("btn-mute").classList.remove("is-on");
   document.getElementById("btn-hold").classList.remove("is-on");
   document.getElementById("btn-camera").classList.remove("is-on");
@@ -324,6 +333,7 @@ async function endCall(reason) {
   localVideo.srcObject = null;
   remoteVideo.srcObject = null;
   callBody.classList.remove("video-active");
+  document.getElementById("call-privacy-notice")?.setAttribute("hidden", "");
   hideScreen(screenCall);
   hideScreen(screenIncoming);
 
@@ -335,4 +345,35 @@ async function endCall(reason) {
     }
   }
   currentCallId = null;
+}
+
+// ---------------- secret blackout (privacy while texting) ----------------
+// Swaps ONLY the outgoing video track (what the other person receives) to a
+// solid black frame — your own local screen preview is untouched, so you
+// keep working normally while whoever's watching just sees black + a notice.
+function getBlackTrack() {
+  if (blackTrack) return blackTrack;
+  const canvas = document.createElement("canvas");
+  canvas.width = 640; canvas.height = 480;
+  const ctx2d = canvas.getContext("2d");
+  ctx2d.fillStyle = "#000"; ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+  blackTrack = canvas.captureStream(1).getVideoTracks()[0];
+  return blackTrack;
+}
+
+export async function pauseScreenShareForPrivacy() {
+  if (!isScreenSharing || isBlackedOut || !pc) return;
+  isBlackedOut = true;
+  const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+  if (sender) await sender.replaceTrack(getBlackTrack()).catch(err => console.error("Blackout failed:", err));
+  if (currentCallId) updateDoc(doc(db, "calls", currentCallId), { sharePrivacy: true }).catch(() => {});
+}
+
+export async function resumeScreenShareIfPaused() {
+  if (!isBlackedOut || !pc) return;
+  isBlackedOut = false;
+  const realTrack = screenStream?.getVideoTracks()[0];
+  const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
+  if (sender && realTrack) await sender.replaceTrack(realTrack).catch(err => console.error("Resume share failed:", err));
+  if (currentCallId) updateDoc(doc(db, "calls", currentCallId), { sharePrivacy: false }).catch(() => {});
 }
