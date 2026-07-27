@@ -8,6 +8,7 @@ import {
 import {
   ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import { pauseScreenShareForPrivacy, resumeScreenShareIfPaused } from "./call.js";
 
 const chatEmpty = document.getElementById("chat-empty");
 const chatActive = document.getElementById("chat-active");
@@ -139,6 +140,17 @@ document.getElementById("btn-attach-media")?.addEventListener("click", (e) => {
   mediaInput.click();
 });
 
+document.getElementById("btn-game-hexagone")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  attachMenu.hidden = true;
+  window.open("https://apac2324.github.io/Hex-A-Gone/", "_blank", "noopener");
+});
+document.getElementById("btn-game-truthordare")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  attachMenu.hidden = true;
+  window.open("https://apac2324.github.io/Truth-or-dare-don-t-be-scared/", "_blank", "noopener");
+});
+
 mediaInput?.addEventListener("change", async () => {
   const file = mediaInput.files?.[0];
   mediaInput.value = "";
@@ -174,4 +186,25 @@ mediaInput?.addEventListener("change", async () => {
     console.error("Media upload failed:", err);
     showToast(`Upload failed: ${err.code || err.message || "unknown error"}`);
   }
+});
+
+// ---------------- secret blackout while texting ----------------
+// If you're screen-sharing on a call and start typing here, the person
+// watching your screen sees it go black (your own view is unaffected) —
+// resumes automatically once you stop typing / leave the input.
+const msgInputForPrivacy = document.getElementById("message-input");
+let privacyResumeTimer = null;
+
+msgInputForPrivacy?.addEventListener("focus", () => {
+  clearTimeout(privacyResumeTimer);
+  pauseScreenShareForPrivacy();
+});
+msgInputForPrivacy?.addEventListener("input", () => {
+  clearTimeout(privacyResumeTimer);
+  pauseScreenShareForPrivacy();
+});
+msgInputForPrivacy?.addEventListener("blur", () => {
+  // Small delay so clicking the send button (which blurs the input first)
+  // doesn't cause a flicker of resuming right before the message sends.
+  privacyResumeTimer = setTimeout(resumeScreenShareIfPaused, 600);
 });
