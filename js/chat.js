@@ -17,6 +17,7 @@ const messagesEl = document.getElementById("messages");
 export function openChat(chatId, peer) {
   if (state.unsubMessages) state.unsubMessages();
   if (state.unsubPeerDoc) state.unsubPeerDoc();
+  if (state.unsubChatDoc) state.unsubChatDoc();
 
   state.activeChatId = chatId;
   state.activePeer = peer;
@@ -38,28 +39,75 @@ export function openChat(chatId, peer) {
     console.error("openChat called without peer.uid — badge won't update live, but messages will still load.");
   }
 
+  // Typing indicator — watches the chat doc's `typing` map for anyone else's flag.
+  const typingEl = document.getElementById("typing-indicator");
+  state.unsubChatDoc = onSnapshot(doc(db, "chats", chatId), (snap) => {
+    const typing = snap.data()?.typing || {};
+    const othersTyping = Object.entries(typing)
+      .filter(([uid, isTyping]) => uid !== state.user.uid && isTyping)
+      .map(([uid]) => peer.participantInfo?.[uid]?.displayName)
+      .filter(Boolean);
+    if (othersTyping.length === 0) {
+      typingEl.hidden = true;
+    } else {
+      typingEl.hidden = false;
+      typingEl.textContent = peer.isGroup
+        ? `${othersTyping.join(", ")} typing…`
+        : "typing…";
+    }
+  }, (err) => console.error("Typing listener failed:", err));
+
   const q = query(collection(db, "chats", chatId, "messages"), orderBy("clientTime", "asc"));
   state.unsubMessages = onSnapshot(q,
     (snap) => {
       messagesEl.innerHTML = "";
       snap.forEach((docSnap) => {
         const m = docSnap.data();
+        const messageId = docSnap.id;
         const mine = m.senderId === state.user.uid;
         const time = m.clientTime ? new Date(m.clientTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
         const bubble = document.createElement("div");
         bubble.className = "msg " + (mine ? "msg-mine" : "msg-theirs");
+        bubble.dataset.msgId = messageId;
+
         let senderLabel = "";
         if (!mine && peer.isGroup) {
           const senderName = peer.participantInfo?.[m.senderId]?.displayName;
           if (senderName) senderLabel = `<span class="msg-sender">${escapeHtml(senderName)}</span>`;
         }
-        let mediaHtml = "";
-        if (m.mediaUrl && m.mediaType === "image") {
-          mediaHtml = `<img class="msg-media" src="${m.mediaUrl}" alt="image" />`;
-        } else if (m.mediaUrl && m.mediaType === "video") {
-          mediaHtml = `<video class="msg-media" src="${m.mediaUrl}" controls></video>`;
+
+        let bodyHtml;
+        if (m.deleted) {
+          bodyHtml = `<em class="msg-deleted">Message deleted</em>`;
+        } else {
+          let mediaHtml = "";
+          if (m.mediaUrl && m.mediaType === "image") mediaHtml = `<img class="msg-media" src="${m.mediaUrl}" alt="image" />`;
+          else if (m.mediaUrl && m.mediaType === "video") mediaHtml = `<video class="msg-media" src="${m.mediaUrl}" controls></video>`;
+          bodyHtml = `<span class="msg-text">${mediaHtml}${m.text ? escapeHtml(m.text) : ""}</span>`;
         }
-        bubble.innerHTML = `${senderLabel}${mediaHtml}${m.text ? escapeHtml(m.text) : ""}<span class="msg-time">${time}</span>`;
+
+        const editedTag = (m.edited && !m.deleted) ? `<span class="msg-edited">(edited)</span>` : "";
+
+        let reactionsHtml = "";
+        if (m.reactions && Object.keys(m.reactions).length) {
+          const counts = {};
+          Object.values(m.reactions).forEach(em => { counts[em] = (counts[em] || 0) + 1; });
+          reactionsHtml = `<div class="msg-reactions">` + Object.entries(counts).map(([em, count]) => {
+            const isMine = m.reactions[state.user.uid] === em;
+            return `<button type="button" class="msg-reaction-pill${isMine ? " mine" : ""}" data-emoji="${em}">${em} ${count}</button>`;
+          }).join("") + `</div>`;
+        }
+
+        let actionsHtml = "";
+        if (!m.deleted) {
+          actionsHtml = `<div class="msg-actions">
+            <button type="button" class="msg-action-btn" data-action="react" title="React">🙂</button>
+            ${mine ? `<button type="button" class="msg-action-btn" data-action="edit" title="Edit">✎</button>` : ""}
+            ${mine ? `<button type="button" class="msg-action-btn" data-action="delete" title="Delete">🗑</button>` : ""}
+          </div>`;
+        }
+
+        bubble.innerHTML = `${senderLabel}${bodyHtml}${editedTag}<span class="msg-time">${time}</span>${reactionsHtml}${actionsHtml}`;
         messagesEl.appendChild(bubble);
       });
       messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -78,6 +126,7 @@ document.getElementById("form-message").addEventListener("submit", async (e) => 
   const text = input.value.trim();
   if (!text) return;
   input.value = "";
+  setTyping(false);
 
   try {
     await addDoc(collection(db, "chats", state.activeChatId, "messages"), {
@@ -208,3 +257,141 @@ msgInputForPrivacy?.addEventListener("blur", () => {
   // doesn't cause a flicker of resuming right before the message sends.
   privacyResumeTimer = setTimeout(resumeScreenShareIfPaused, 600);
 });
+
+// ---------------- typing indicator ----------------
+let isCurrentlyTyping = false;
+let typingClearTimer = null;
+
+function setTyping(isTyping) {
+  if (!state.activeChatId) return;
+  if (isTyping === isCurrentlyTyping) return;
+  isCurrentlyTyping = isTyping;
+  updateDoc(doc(db, "chats", state.activeChatId), { [`typing.${state.user.uid}`]: isTyping }).catch(() => {});
+}
+
+document.getElementById("message-input")?.addEventListener("input", () => {
+  setTyping(true);
+  clearTimeout(typingClearTimer);
+  typingClearTimer = setTimeout(() => setTyping(false), 3000);
+});
+document.getElementById("message-input")?.addEventListener("blur", () => {
+  clearTimeout(typingClearTimer);
+  setTyping(false);
+});
+
+// ---------------- message actions: react / edit / delete ----------------
+const reactionPicker = document.getElementById("reaction-picker");
+const REACTION_SET = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+let reactionTargetMsgId = null;
+let reactionBuilt = false;
+
+function buildReactionPicker() {
+  if (reactionBuilt) return;
+  reactionPicker.innerHTML = REACTION_SET.map(em => `<button type="button" class="emoji-btn">${em}</button>`).join("");
+  reactionPicker.querySelectorAll(".emoji-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!reactionTargetMsgId || !state.activeChatId) return;
+      reactionPicker.hidden = true;
+      const msgRef = doc(db, "chats", state.activeChatId, "messages", reactionTargetMsgId);
+      try {
+        await updateDoc(msgRef, { [`reactions.${state.user.uid}`]: btn.textContent });
+      } catch (err) {
+        console.error("Reaction failed:", err);
+        showToast(`Reaction didn't save: ${err.code || err.message || "unknown error"}`);
+      }
+    });
+  });
+  reactionBuilt = true;
+}
+
+messagesEl.addEventListener("click", async (e) => {
+  const bubble = e.target.closest(".msg");
+  if (!bubble) return;
+  const msgId = bubble.dataset.msgId;
+  if (!msgId || !state.activeChatId) return;
+  const msgRef = doc(db, "chats", state.activeChatId, "messages", msgId);
+
+  // Clicking an existing reaction pill: toggle it off if it's yours, otherwise switch to it.
+  const pill = e.target.closest(".msg-reaction-pill");
+  if (pill) {
+    try {
+      if (pill.classList.contains("mine")) {
+        await updateDoc(msgRef, { [`reactions.${state.user.uid}`]: null });
+      } else {
+        await updateDoc(msgRef, { [`reactions.${state.user.uid}`]: pill.dataset.emoji });
+      }
+    } catch (err) {
+      console.error("Reaction toggle failed:", err);
+    }
+    return;
+  }
+
+  const actionBtn = e.target.closest(".msg-action-btn");
+  if (!actionBtn) return;
+  const action = actionBtn.dataset.action;
+
+  if (action === "react") {
+    buildReactionPicker();
+    reactionTargetMsgId = msgId;
+    reactionPicker.hidden = !reactionPicker.hidden;
+    return;
+  }
+
+  if (action === "delete") {
+    if (!confirm("Delete this message?")) return;
+    try {
+      await updateDoc(msgRef, { deleted: true, text: "" });
+    } catch (err) {
+      console.error("Delete failed:", err);
+      showToast(`Couldn't delete: ${err.code || err.message || "unknown error"}`);
+    }
+    return;
+  }
+
+  if (action === "edit") {
+    const textEl = bubble.querySelector(".msg-text");
+    const currentText = textEl ? textEl.textContent : "";
+    bubble.innerHTML = `
+      <div class="msg-edit-row">
+        <input type="text" class="msg-edit-input" value="${escapeHtml(currentText)}" />
+        <button type="button" class="btn-ghost msg-edit-save">Save</button>
+        <button type="button" class="btn-ghost msg-edit-cancel">Cancel</button>
+      </div>`;
+    const editInput = bubble.querySelector(".msg-edit-input");
+    editInput.focus();
+    editInput.setSelectionRange(currentText.length, currentText.length);
+
+    const save = async () => {
+      const newText = editInput.value.trim();
+      if (!newText) return;
+      try {
+        await updateDoc(msgRef, { text: newText, edited: true });
+      } catch (err) {
+        console.error("Edit failed:", err);
+        showToast(`Couldn't save edit: ${err.code || err.message || "unknown error"}`);
+      }
+    };
+    bubble.querySelector(".msg-edit-save").addEventListener("click", save);
+    editInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") save(); });
+    bubble.querySelector(".msg-edit-cancel").addEventListener("click", () => {
+      // Listener will re-render this bubble back to normal on the next
+      // snapshot anyway, but re-triggering isn't guaranteed instantly —
+      // easiest reliable fix is to just leave editing mode by re-running
+      // the render for this one message from current Firestore state.
+      onSnapshotForceRerender();
+    });
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (!reactionPicker.hidden && !reactionPicker.contains(e.target) && !e.target.closest('[data-action="react"]')) {
+    reactionPicker.hidden = true;
+  }
+});
+
+// Cancel-edit fallback: nudges the messages listener by touching nothing —
+// since Firestore listeners don't replay on demand, simplest reliable
+// approach is to just reload this chat's view from state.
+function onSnapshotForceRerender() {
+  if (state.activeChatId && state.activePeer) openChat(state.activeChatId, state.activePeer);
+}
