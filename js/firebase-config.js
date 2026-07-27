@@ -13,8 +13,7 @@ import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/
 import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 const firebaseConfig = {
-  const firebaseConfig = {
- apiKey: "AIzaSyCDftJk-PrtrBJl2w1E8St_Ln9-pbU8Hk8",
+  apiKey: "AIzaSyCDftJk-PrtrBJl2w1E8St_Ln9-pbU8Hk8",
   authDomain: "vox-chat-e0987.firebaseapp.com",
   projectId: "vox-chat-e0987",
   storageBucket: "vox-chat-e0987.firebasestorage.app",
@@ -28,4 +27,4 @@ export const auth = getAuth(app);
 // that's `undefined` (varies by browser) — without this, Firestore rejects
 // the ENTIRE write with "invalid-argument" instead of just skipping that field.
 export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
-export const storage = getStorage(app);// ============================================================
+export const storage = getStorage(app);
