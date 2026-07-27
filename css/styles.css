@@ -407,3 +407,10 @@ input:focus-visible, button:focus-visible{
   font-size:36px; font-weight:700; cursor:pointer; color: var(--white);
 }
 .game-cell:disabled{ cursor:default; }
+
+/* ---------------- Screen-share privacy notice ---------------- */
+.call-privacy-notice{
+  font-family: var(--font-mono); font-size:12px; color: var(--white);
+  background: rgba(0,0,0,.6); border:1px solid var(--border); padding:6px 12px;
+  border-radius: 999px; z-index:2;
+}
