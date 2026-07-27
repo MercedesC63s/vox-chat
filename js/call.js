@@ -37,9 +37,10 @@ const localVideo = document.getElementById("local-video");
 function showScreen(el) { el.hidden = false; el.classList.add("active"); }
 function hideScreen(el) { el.hidden = true; el.classList.remove("active"); }
 
-// Try camera + mic; fall back to mic-only if no camera / permission denied,
-// so a call can still happen even without video.
-async function getLocalStream() {
+// Try camera + mic (if video requested); fall back to mic-only if no camera
+// / permission denied, so a call can still happen even without video.
+async function getLocalStream(wantVideo) {
+  if (!wantVideo) return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: true, video: { width: 480, height: 640 } });
   } catch (err) {
@@ -57,14 +58,15 @@ function setupLocalVideo() {
 }
 
 // ---------------- outgoing ----------------
-document.getElementById("btn-call").addEventListener("click", startCall);
+document.getElementById("btn-call").addEventListener("click", () => startCall(false));
+document.getElementById("btn-video-call").addEventListener("click", () => startCall(true));
 
-async function startCall() {
+async function startCall(wantVideo) {
   if (!state.activePeer) return;
   isCaller = true;
 
   try {
-    localStream = await getLocalStream();
+    localStream = await getLocalStream(wantVideo);
     pc = new RTCPeerConnection(ICE_SERVERS);
     localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
     attachRemoteTrack();
@@ -83,6 +85,7 @@ async function startCall() {
       callerName: state.profile.displayName,
       calleeId: state.activePeer.uid,
       calleeName: state.activePeer.displayName,
+      callType: wantVideo ? "video" : "audio",
       offer: { type: offer.type, sdp: offer.sdp },
       status: "ringing",
       createdAt: serverTimestamp()
@@ -146,7 +149,7 @@ function handleIncomingCall(callId, data) {
     ringtone.stop();
     hideScreen(screenIncoming);
     try {
-      localStream = await getLocalStream();
+      localStream = await getLocalStream(data.callType === "video");
       pc = new RTCPeerConnection(ICE_SERVERS);
       localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
       attachRemoteTrack();
@@ -280,6 +283,11 @@ async function toggleScreenShare() {
 
     // Covers both the in-app button AND the browser's own native "Stop sharing" bar.
     screenTrack.onended = () => { if (isScreenSharing) stopScreenShare(); };
+
+    // Edge case found on review: if the message box already had focus the
+    // instant sharing started, no focus/input event would fire to trigger
+    // the blackout — engage it immediately in that case.
+    if (document.activeElement?.id === "message-input") pauseScreenShareForPrivacy();
   } else {
     stopScreenShare();
   }
