@@ -327,6 +327,7 @@ document.getElementById("btn-new-group")?.addEventListener("click", () => {
   groupErrEl.textContent = "";
   groupMatchesEl.innerHTML = "";
   renderGroupMemberChips();
+  closeDrawer();
 });
 
 document.getElementById("btn-cancel-new-group")?.addEventListener("click", () => {
