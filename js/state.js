@@ -7,5 +7,6 @@ export const state = {
   activePeer: null,     // { uid, displayName, email }
   unsubMessages: null,  // firestore listener teardown for current chat
   unsubPeerDoc: null,    // firestore listener teardown for the open peer's live profile (badge/status)
+  unsubChatDoc: null,     // firestore listener teardown for the open chat doc itself (typing indicator)
   schoolMode: false,     // when true: incoming calls stay silent, notification only
 };
