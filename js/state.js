@@ -9,4 +9,5 @@ export const state = {
   unsubPeerDoc: null,    // firestore listener teardown for the open peer's live profile (badge/status)
   unsubChatDoc: null,     // firestore listener teardown for the open chat doc itself (typing indicator)
   schoolMode: false,     // when true: incoming calls stay silent, notification only
+  userCache: {},          // live uid -> {displayName, email, ...} — keeps names fresh everywhere, even in old chats
 };
