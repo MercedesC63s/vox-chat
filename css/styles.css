@@ -154,7 +154,7 @@ input:focus-visible, button:focus-visible{
 #chat-empty[hidden], #chat-active[hidden]{ display:none !important; }
 .chat-header{
   display:flex; align-items:center; justify-content:space-between;
-  padding: 16px 24px 16px 60px; border-bottom:1px solid var(--border); background: var(--bg);
+  padding: 16px 56px 16px 60px; border-bottom:1px solid var(--border); background: var(--bg);
 }
 .chat-header-left{ display:flex; align-items:center; }
 .peer-info{ display:flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px; }
@@ -494,3 +494,4 @@ input:focus-visible, button:focus-visible{
 .msg-mine .msg-edit-input{ color:#0a0a0a; background: rgba(0,0,0,.08); }
 .msg-edit-row .btn-ghost{ padding:4px 8px; font-size:11px; }
 .chat-header-right{ display:flex; gap:8px; }
+.notif-wrap-floating{ position:absolute; top:16px; right:20px; z-index:20; }
