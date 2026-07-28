@@ -2,12 +2,12 @@ import { auth, db } from "./firebase-config.js";
 import { state } from "./state.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, setDoc, getDoc, updateDoc, collection, query, where,
+  doc, setDoc, getDoc, updateDoc, collection, query, where, or,
   onSnapshot, serverTimestamp, getDocs, addDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { openChat } from "./chat.js";
 import { listenForIncomingCalls } from "./call.js";
-import { requestNotificationPermission, notify } from "./notifications.js";
+import { requestNotificationPermission, notify, startNotificationCenter, stopNotificationCenter } from "./notifications.js";
 import { showToast } from "./toast.js";
 
 const screenAuth = document.getElementById("screen-auth");
@@ -39,7 +39,12 @@ onAuthStateChanged(auth, async (user) => {
     // Load (or self-heal) the profile doc. A Firestore hiccup here should
     // never trap the user on the login screen — fall back to what we
     // already know from the auth account itself.
-    state.profile = { uid: user.uid, displayName: user.displayName || "you", email: (user.email || "").toLowerCase() };
+    // Reload first: right after signup, Auth's own user.displayName can
+    // still be empty for a moment because updateProfile() is a separate
+    // async call — reload() picks it up if it just finished.
+    try { await user.reload(); } catch (_) {}
+    const safeName = user.displayName || (user.email ? user.email.split("@")[0] : "member");
+    state.profile = { uid: user.uid, displayName: safeName, email: (user.email || "").toLowerCase() };
     try {
       const snap = await getDoc(doc(db, "users", user.uid));
       if (snap.exists()) {
@@ -81,7 +86,11 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("screen-banned")?.classList.remove("active");
 
     const modBtn = document.getElementById("btn-mod-menu");
-    if (modBtn) modBtn.hidden = !["owner", "co-owner", "admin"].includes(state.profile.role);
+    if (modBtn) {
+      const canModerate = ["owner", "co-owner", "admin"].includes(state.profile.role);
+      if (!canModerate) modBtn.remove();
+      else modBtn.hidden = false;
+    }
 
     state.schoolMode = state.profile.schoolMode === true;
     const schoolBtn = document.getElementById("btn-school-mode");
@@ -97,11 +106,16 @@ onAuthStateChanged(auth, async (user) => {
     listenToChats();
     listenForIncomingCalls();
     requestNotificationPermission();
+    startNotificationCenter();
+    startUserCache();
   } else {
     state.user = null;
     state.profile = null;
     screenApp.classList.remove("active");
     screenAuth.classList.add("active");
+    stopNotificationCenter();
+    if (unsubUserCache) { unsubUserCache(); unsubUserCache = null; }
+    state.userCache = {};
   }
 });
 
@@ -126,6 +140,23 @@ export function closeDrawer() { appShell?.classList.remove("sidebar-open"); }
 document.getElementById("btn-menu")?.addEventListener("click", openDrawer);
 document.getElementById("sidebar-backdrop")?.addEventListener("click", closeDrawer);
 
+// ---- live name cache (fixes names getting stuck on old chat snapshots) ----
+let unsubUserCache = null;
+function startUserCache() {
+  unsubUserCache = onSnapshot(collection(db, "users"), (snap) => {
+    snap.docChanges().forEach((change) => {
+      if (change.type === "removed") { delete state.userCache[change.doc.id]; return; }
+      state.userCache[change.doc.id] = change.doc.data();
+    });
+  }, (err) => console.error("User cache listener failed:", err));
+}
+
+// Prefer the live users collection over a name baked into an old chat
+// document — that snapshot goes stale the moment someone renames themself.
+export function liveName(uid, fallbackName) {
+  return state.userCache[uid]?.displayName || fallbackName;
+}
+
 // ---- chat list ----
 let hasAutoOpenedAChat = false;
 function listenToChats() {
@@ -142,7 +173,7 @@ function listenToChats() {
       const isOpenAndFocused = state.activeChatId === change.doc.id && document.hasFocus();
       if (isOpenAndFocused) return;
       const peer = chat.participantInfo?.[chat.lastMessageSenderId];
-      notify(peer?.displayName || "New message", chat.lastMessage || "");
+      notify(liveName(chat.lastMessageSenderId, peer?.displayName) || "New message", chat.lastMessage || "");
     });
 
     const list = document.getElementById("chat-list");
@@ -157,7 +188,7 @@ function listenToChats() {
         const peerUid = state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0];
         const peerInfo = chat.participantInfo?.[peerUid];
         if (!peerInfo) return;
-        peer = { ...peerInfo, uid: peerUid };
+        peer = { ...peerInfo, uid: peerUid, displayName: liveName(peerUid, peerInfo.displayName) };
       }
       if (!firstChat) firstChat = { id: docSnap.id, peer };
       const item = document.createElement("div");
@@ -201,6 +232,7 @@ const matchesEl = document.getElementById("new-chat-matches");
 function goToEmptyScreen() {
   if (state.unsubMessages) { state.unsubMessages(); state.unsubMessages = null; }
   if (state.unsubPeerDoc) { state.unsubPeerDoc(); state.unsubPeerDoc = null; }
+  if (state.unsubChatDoc) { state.unsubChatDoc(); state.unsubChatDoc = null; }
   state.activeChatId = null;
   state.activePeer = null;
   document.getElementById("chat-active").hidden = true;
@@ -222,6 +254,24 @@ function showNewChatPanel() {
   matchesEl.innerHTML = "";
   nameInput.value = "";
   nameInput.focus();
+  renderSuggestions(document.getElementById("new-chat-suggestions"), (peer) => beginChatWith(peer));
+}
+
+function renderSuggestions(container, onPick, excludeUids = []) {
+  if (!container) return;
+  const all = Object.entries(state.userCache)
+    .filter(([uid, u]) => uid !== state.user.uid && u.banned !== true && !excludeUids.includes(uid))
+    .map(([uid, u]) => ({ ...u, uid }))
+    .slice(0, 12);
+  if (all.length === 0) { container.innerHTML = ""; return; }
+  container.innerHTML = `<p class="panel-sub" style="margin:10px 0 4px;">Suggested</p>` +
+    all.map(u => `<div class="match-row" data-uid="${u.uid}">
+      <div class="chat-avatar">${initials(u.displayName)}</div>
+      <div><div class="n">${escapeHtml(u.displayName || "—")}</div><div class="e">${escapeHtml(u.email || "")}</div></div>
+    </div>`).join("");
+  container.querySelectorAll("[data-uid]").forEach((row) => {
+    row.addEventListener("click", () => onPick(all.find(u => u.uid === row.dataset.uid)));
+  });
 }
 
 // Sidebar's "+ New conversation" — return to the empty screen, panel open.
@@ -261,9 +311,11 @@ async function startConversation() {
   const name = nameInput.value.trim();
   errEl.textContent = "";
   matchesEl.innerHTML = "";
-  if (!name) { errEl.textContent = "Enter a display name first."; return; }
-  if (name.toLowerCase() === (state.profile.displayNameLower || state.profile.displayName?.toLowerCase())) {
-    errEl.textContent = "That's your own name."; return;
+  if (!name) { errEl.textContent = "Enter a display name or email first."; return; }
+  const isEmail = name.includes("@");
+  const lower = name.toLowerCase();
+  if (lower === (isEmail ? state.profile.email : (state.profile.displayNameLower || state.profile.displayName?.toLowerCase()))) {
+    errEl.textContent = "That's you."; return;
   }
 
   startBtn.disabled = true;
@@ -271,11 +323,11 @@ async function startConversation() {
   startBtn.textContent = "Searching…";
 
   try {
-    const usersQ = query(collection(db, "users"), where("displayNameLower", "==", name.toLowerCase()));
+    const usersQ = query(collection(db, "users"), or(where("email", "==", lower), where("displayNameLower", "==", lower)));
     const usersSnap = await getDocs(usersQ);
     const matches = usersSnap.docs.map(d => d.data()).filter(u => u.uid !== state.user.uid);
 
-    if (matches.length === 0) { errEl.textContent = "No vox account with that display name."; return; }
+    if (matches.length === 0) { errEl.textContent = `No vox account with that ${isEmail ? "email" : "display name"}.`; return; }
 
     if (matches.length === 1) {
       await beginChatWith(matches[0]);
@@ -345,23 +397,35 @@ function renderGroupMemberChips() {
     btn.addEventListener("click", () => {
       pendingGroupMembers.splice(Number(btn.dataset.removeIdx), 1);
       renderGroupMemberChips();
+      renderGroupSuggestions();
     });
   });
+  renderGroupSuggestions();
+}
+
+function renderGroupSuggestions() {
+  renderSuggestions(
+    document.getElementById("new-group-suggestions"),
+    (u) => { pendingGroupMembers.push(u); renderGroupMemberChips(); },
+    pendingGroupMembers.map(m => m.uid)
+  );
 }
 
 document.getElementById("btn-add-group-member")?.addEventListener("click", async () => {
   const name = groupMemberInput.value.trim();
   groupErrEl.textContent = "";
   groupMatchesEl.innerHTML = "";
-  if (!name) { groupErrEl.textContent = "Enter a display name first."; return; }
+  if (!name) { groupErrEl.textContent = "Enter a display name or email first."; return; }
+  const isEmail = name.includes("@");
+  const lower = name.toLowerCase();
 
   try {
-    const usersQ = query(collection(db, "users"), where("displayNameLower", "==", name.toLowerCase()));
+    const usersQ = query(collection(db, "users"), or(where("email", "==", lower), where("displayNameLower", "==", lower)));
     const usersSnap = await getDocs(usersQ);
     const matches = usersSnap.docs.map(d => d.data())
       .filter(u => u.uid !== state.user.uid && !pendingGroupMembers.some(m => m.uid === u.uid));
 
-    if (matches.length === 0) { groupErrEl.textContent = "No new match with that name."; return; }
+    if (matches.length === 0) { groupErrEl.textContent = "No new match with that name/email."; return; }
 
     if (matches.length === 1) {
       pendingGroupMembers.push(matches[0]);
