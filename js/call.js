@@ -27,6 +27,9 @@ let isOnHold = false;
 let isCameraOff = false;
 let isBlackedOut = false;
 let blackTrack = null;
+let renegotiationCounter = 0;
+let lastHandledOfferId = null;
+let lastAppliedAnswerForId = null;
 
 const screenIncoming = document.getElementById("screen-incoming");
 const screenCall = document.getElementById("screen-call");
@@ -45,6 +48,7 @@ async function getLocalStream(wantVideo) {
     return await navigator.mediaDevices.getUserMedia({ audio: true, video: { width: 480, height: 640 } });
   } catch (err) {
     console.error("Camera unavailable, falling back to audio-only:", err);
+    showToast("Camera unavailable — continuing with audio only. (The other person may still see their own video.)");
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
 }
@@ -53,8 +57,6 @@ function setupLocalVideo() {
   const hasVideo = localStream.getVideoTracks().length > 0;
   localVideo.srcObject = localStream;
   localVideo.classList.toggle("no-video", !hasVideo || isCameraOff);
-  document.getElementById("btn-camera").hidden = !hasVideo;
-  document.getElementById("btn-screenshare").hidden = !hasVideo;
 }
 
 // ---------------- outgoing ----------------
@@ -63,6 +65,10 @@ document.getElementById("btn-video-call").addEventListener("click", () => startC
 
 async function startCall(wantVideo) {
   if (!state.activePeer) return;
+  if (state.activePeer.isGroup || !state.activePeer.uid) {
+    showToast("Group calling isn't supported yet — this only works in 1:1 conversations for now.");
+    return;
+  }
   isCaller = true;
 
   try {
@@ -106,6 +112,7 @@ async function startCall(wantVideo) {
         listenForCandidates(callRef, "calleeCandidates");
       }
       updatePrivacyNotice(data);
+      handleRenegotiation(data);
       if (data.status === "declined") { ringtone.stop(); endCall("declined"); }
       if (data.status === "ended") { ringtone.stop(); endCall(); }
     });
@@ -173,7 +180,7 @@ function handleIncomingCall(callId, data) {
 
       unsubCallDoc = onSnapshot(callRef, (snap) => {
         const d = snap.data();
-        if (d) updatePrivacyNotice(d);
+        if (d) { updatePrivacyNotice(d); handleRenegotiation(d); }
         if (d?.status === "ended") endCall();
       });
     } catch (err) {
@@ -183,6 +190,59 @@ function handleIncomingCall(callId, data) {
       if (pc) { pc.close(); pc = null; }
     }
   };
+}
+
+// ---------------- renegotiation (adding a track mid-call) ----------------
+// The initial offer/answer only covers whatever tracks existed at call
+// start. Turning on video (or screen share) during an audio-only call adds
+// a NEW track, which needs its own offer/answer round-trip — this is that.
+async function pushRenegotiation() {
+  if (!pc || !currentCallId) return;
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    renegotiationCounter += 1;
+    const myId = renegotiationCounter;
+    await updateDoc(doc(db, "calls", currentCallId), {
+      renegotiateOffer: { type: offer.type, sdp: offer.sdp },
+      renegotiateFrom: state.user.uid,
+      renegotiationId: myId
+    });
+  } catch (err) {
+    console.error("Renegotiation failed to start:", err);
+    showToast("Couldn't turn that on — try again.");
+  }
+}
+
+async function handleRenegotiation(data) {
+  if (!data.renegotiationId || !pc || !currentCallId) return;
+
+  if (data.renegotiateFrom === state.user.uid) {
+    // We initiated this — apply the matching answer once, when it arrives.
+    if (data.renegotiateAnswer && data.renegotiateAnswerFor === data.renegotiationId &&
+        lastAppliedAnswerForId !== data.renegotiationId) {
+      lastAppliedAnswerForId = data.renegotiationId;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.renegotiateAnswer));
+      } catch (err) {
+        console.error("Failed to apply renegotiation answer:", err);
+      }
+    }
+  } else if (lastHandledOfferId !== data.renegotiationId && data.renegotiateOffer) {
+    // Someone else added a track — answer it.
+    lastHandledOfferId = data.renegotiationId;
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(data.renegotiateOffer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await updateDoc(doc(db, "calls", currentCallId), {
+        renegotiateAnswer: { type: answer.type, sdp: answer.sdp },
+        renegotiateAnswerFor: data.renegotiationId
+      });
+    } catch (err) {
+      console.error("Failed to answer renegotiation:", err);
+    }
+  }
 }
 
 function listenForCandidates(callRef, subcol) {
@@ -246,10 +306,27 @@ document.getElementById("btn-mute").addEventListener("click", (e) => {
   e.currentTarget.classList.toggle("is-on", isMuted);
 });
 
-document.getElementById("btn-camera").addEventListener("click", (e) => {
-  if (!localStream) return;
+document.getElementById("btn-camera").addEventListener("click", async (e) => {
+  if (!localStream || !pc) return;
   const videoTracks = localStream.getVideoTracks();
-  if (videoTracks.length === 0) return;
+
+  if (videoTracks.length === 0) {
+    // Audio-only call — turn the camera on for the first time.
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 640 } });
+      const camTrack = camStream.getVideoTracks()[0];
+      localStream.addTrack(camTrack);
+      pc.addTrack(camTrack, localStream);
+      setupLocalVideo();
+      e.currentTarget.title = "Turn camera off";
+      await pushRenegotiation();
+    } catch (err) {
+      console.error("Couldn't turn camera on:", err);
+      showToast("Couldn't access your camera.");
+    }
+    return;
+  }
+
   isCameraOff = !isCameraOff;
   videoTracks.forEach(t => t.enabled = !isCameraOff);
   localVideo.classList.toggle("no-video", isCameraOff);
@@ -273,7 +350,13 @@ async function toggleScreenShare() {
     }
     const screenTrack = screenStream.getVideoTracks()[0];
     const sender = pc.getSenders().find(s => s.track && s.track.kind === "video");
-    if (sender) await sender.replaceTrack(screenTrack);
+    if (sender) {
+      await sender.replaceTrack(screenTrack);
+    } else {
+      // Audio-only call so far — this is the first video track, needs renegotiation.
+      pc.addTrack(screenTrack, screenStream);
+      await pushRenegotiation();
+    }
 
     localVideo.srcObject = screenStream;
     localVideo.classList.remove("no-video");
@@ -334,6 +417,7 @@ async function endCall(reason) {
   if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
   if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
   isMuted = false; isOnHold = false; isCameraOff = false; isScreenSharing = false; isBlackedOut = false;
+  renegotiationCounter = 0; lastHandledOfferId = null; lastAppliedAnswerForId = null;
   document.getElementById("btn-mute").classList.remove("is-on");
   document.getElementById("btn-hold").classList.remove("is-on");
   document.getElementById("btn-camera").classList.remove("is-on");
