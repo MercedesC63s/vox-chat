@@ -67,19 +67,6 @@
           <span id="me-badge"></span>
         </div>
         <div class="header-actions">
-          <div class="notif-wrap">
-            <button id="btn-notifications" class="icon-btn" title="Notifications">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span id="notif-dot" class="notif-dot" hidden></span>
-            </button>
-            <div id="notif-panel" class="attach-menu notif-panel" hidden>
-              <div class="notif-panel-header">
-                <span>Notifications</span>
-                <button id="btn-notif-clear-all" class="btn-ghost" style="padding:4px 10px;font-size:11px;">Clear all</button>
-              </div>
-              <div id="notif-list" class="notif-list"></div>
-            </div>
-          </div>
           <button id="btn-mod-menu" class="icon-btn" title="Mod menu" hidden>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V5l8-3z"/></svg>
           </button>
@@ -107,6 +94,20 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
 
+      <div class="notif-wrap notif-wrap-floating">
+        <button id="btn-notifications" class="icon-btn" title="Notifications">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="notif-dot" class="notif-dot" hidden></span>
+        </button>
+        <div id="notif-panel" class="attach-menu notif-panel" hidden>
+          <div class="notif-panel-header">
+            <span>Notifications</span>
+            <button id="btn-notif-clear-all" class="btn-ghost" style="padding:4px 10px;font-size:11px;">Clear all</button>
+          </div>
+          <div id="notif-list" class="notif-list"></div>
+        </div>
+      </div>
+
       <div id="chat-empty" class="chat-empty">
         <div id="new-chat-panel" class="new-chat-panel" hidden>
           <h3>Start a conversation</h3>
@@ -117,6 +118,7 @@
           </div>
           <p class="auth-error" id="new-chat-error"></p>
           <div id="new-chat-matches" class="new-chat-matches"></div>
+          <div id="new-chat-suggestions" class="new-chat-matches"></div>
           <button id="btn-cancel-new-chat" class="btn-ghost btn-cancel-new-chat">Cancel</button>
         </div>
 
@@ -133,6 +135,7 @@
           <p class="auth-error" id="new-group-error"></p>
           <div id="new-group-matches" class="new-chat-matches"></div>
           <div id="new-group-members" class="new-chat-matches"></div>
+          <div id="new-group-suggestions" class="new-chat-matches"></div>
           <div class="panel-row">
             <button id="btn-create-group" class="btn-primary">Create group</button>
           </div>
