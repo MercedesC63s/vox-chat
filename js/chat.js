@@ -1,6 +1,6 @@
 import { db, storage } from "./firebase-config.js";
 import { state } from "./state.js";
-import { initials, escapeHtml, renderBadge } from "./app.js";
+import { initials, escapeHtml, renderBadge, liveName } from "./app.js";
 import { showToast } from "./toast.js";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, orderBy, query, serverTimestamp
@@ -24,7 +24,18 @@ export function openChat(chatId, peer) {
 
   chatEmpty.hidden = true;
   chatActive.hidden = false;
-  document.getElementById("peer-name").textContent = peer.displayName;
+  document.getElementById("peer-name").textContent = peer.isGroup ? peer.displayName : liveName(peer.uid, peer.displayName);
+
+  const callBtn = document.getElementById("btn-call");
+  const videoCallBtn = document.getElementById("btn-video-call");
+  const callDisabledTitle = "Group calling isn't supported yet — 1:1 only for now";
+  [callBtn, videoCallBtn].forEach((btn) => {
+    if (!btn) return;
+    btn.disabled = !!peer.isGroup;
+    btn.title = peer.isGroup ? callDisabledTitle : (btn === callBtn ? "Audio call" : "Video call");
+    btn.style.opacity = peer.isGroup ? "0.35" : "";
+    btn.style.cursor = peer.isGroup ? "not-allowed" : "";
+  });
   document.querySelector(".app-shell")?.classList.add("chat-open");
 
   document.querySelectorAll(".chat-item").forEach(el => el.classList.remove("active"));
@@ -34,6 +45,9 @@ export function openChat(chatId, peer) {
   if (peer.uid) {
     state.unsubPeerDoc = onSnapshot(doc(db, "users", peer.uid), (snap) => {
       document.getElementById("peer-badge").innerHTML = snap.exists() ? renderBadge(snap.data()) : "";
+      if (snap.exists() && snap.data().displayName) {
+        document.getElementById("peer-name").textContent = snap.data().displayName;
+      }
     }, (err) => console.error("Peer badge listener failed:", err));
   } else {
     console.error("openChat called without peer.uid — badge won't update live, but messages will still load.");
@@ -69,10 +83,12 @@ export function openChat(chatId, peer) {
         const bubble = document.createElement("div");
         bubble.className = "msg " + (mine ? "msg-mine" : "msg-theirs");
         bubble.dataset.msgId = messageId;
+        bubble.dataset.clientTime = m.clientTime || "";
+        bubble.dataset.mine = mine ? "1" : "0";
 
         let senderLabel = "";
         if (!mine && peer.isGroup) {
-          const senderName = peer.participantInfo?.[m.senderId]?.displayName;
+          const senderName = liveName(m.senderId, peer.participantInfo?.[m.senderId]?.displayName);
           if (senderName) senderLabel = `<span class="msg-sender">${escapeHtml(senderName)}</span>`;
         }
 
@@ -98,12 +114,13 @@ export function openChat(chatId, peer) {
           }).join("") + `</div>`;
         }
 
+        const isModerator = ["owner", "co-owner"].includes(state.profile?.role);
         let actionsHtml = "";
         if (!m.deleted) {
           actionsHtml = `<div class="msg-actions">
             <button type="button" class="msg-action-btn" data-action="react" title="React">🙂</button>
             ${mine ? `<button type="button" class="msg-action-btn" data-action="edit" title="Edit">✎</button>` : ""}
-            ${mine ? `<button type="button" class="msg-action-btn" data-action="delete" title="Delete">🗑</button>` : ""}
+            ${(mine || isModerator) ? `<button type="button" class="msg-action-btn" data-action="delete" title="Delete">🗑</button>` : ""}
           </div>`;
         }
 
@@ -304,6 +321,56 @@ function buildReactionPicker() {
   reactionBuilt = true;
 }
 
+const EDIT_WINDOW_MS = 60 * 60 * 1000;      // 1 hour
+const DELETE_WINDOW_MS = 15 * 60 * 1000;    // 15 minutes
+
+function isModeratorNow() {
+  return ["owner", "co-owner"].includes(state.profile?.role);
+}
+
+function enterEditMode(bubble, msgRef) {
+  const clientTime = Number(bubble.dataset.clientTime) || 0;
+  if (Date.now() - clientTime > EDIT_WINDOW_MS) {
+    showToast("Editing window (1 hour) has passed for this message.");
+    return;
+  }
+  const textEl = bubble.querySelector(".msg-text");
+  const currentText = textEl ? textEl.textContent : "";
+  bubble.innerHTML = `
+    <div class="msg-edit-row">
+      <input type="text" class="msg-edit-input" value="${escapeHtml(currentText)}" />
+      <button type="button" class="btn-ghost msg-edit-save">Save</button>
+      <button type="button" class="btn-ghost msg-edit-cancel">Cancel</button>
+    </div>`;
+  const editInput = bubble.querySelector(".msg-edit-input");
+  editInput.focus();
+  editInput.setSelectionRange(currentText.length, currentText.length);
+
+  const save = async () => {
+    const newText = editInput.value.trim();
+    if (!newText) return;
+    try {
+      await updateDoc(msgRef, { text: newText, edited: true });
+    } catch (err) {
+      console.error("Edit failed:", err);
+      showToast(`Couldn't save edit: ${err.code || err.message || "unknown error"}`);
+    }
+  };
+  bubble.querySelector(".msg-edit-save").addEventListener("click", save);
+  editInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") save(); });
+  bubble.querySelector(".msg-edit-cancel").addEventListener("click", onSnapshotForceRerender);
+}
+
+// Double-click your own message to edit it (in addition to the ✎ button).
+messagesEl.addEventListener("dblclick", (e) => {
+  const bubble = e.target.closest(".msg");
+  if (!bubble || bubble.dataset.mine !== "1") return;
+  if (bubble.querySelector(".msg-deleted")) return;
+  const msgId = bubble.dataset.msgId;
+  if (!msgId || !state.activeChatId) return;
+  enterEditMode(bubble, doc(db, "chats", state.activeChatId, "messages", msgId));
+});
+
 messagesEl.addEventListener("click", async (e) => {
   const bubble = e.target.closest(".msg");
   if (!bubble) return;
@@ -338,6 +405,12 @@ messagesEl.addEventListener("click", async (e) => {
   }
 
   if (action === "delete") {
+    const mine = bubble.dataset.mine === "1";
+    const clientTime = Number(bubble.dataset.clientTime) || 0;
+    if (!isModeratorNow() && mine && Date.now() - clientTime > DELETE_WINDOW_MS) {
+      showToast("Can't delete — it's been more than 15 minutes since you sent this.");
+      return;
+    }
     if (!confirm("Delete this message?")) return;
     try {
       await updateDoc(msgRef, { deleted: true, text: "" });
@@ -349,37 +422,7 @@ messagesEl.addEventListener("click", async (e) => {
   }
 
   if (action === "edit") {
-    const textEl = bubble.querySelector(".msg-text");
-    const currentText = textEl ? textEl.textContent : "";
-    bubble.innerHTML = `
-      <div class="msg-edit-row">
-        <input type="text" class="msg-edit-input" value="${escapeHtml(currentText)}" />
-        <button type="button" class="btn-ghost msg-edit-save">Save</button>
-        <button type="button" class="btn-ghost msg-edit-cancel">Cancel</button>
-      </div>`;
-    const editInput = bubble.querySelector(".msg-edit-input");
-    editInput.focus();
-    editInput.setSelectionRange(currentText.length, currentText.length);
-
-    const save = async () => {
-      const newText = editInput.value.trim();
-      if (!newText) return;
-      try {
-        await updateDoc(msgRef, { text: newText, edited: true });
-      } catch (err) {
-        console.error("Edit failed:", err);
-        showToast(`Couldn't save edit: ${err.code || err.message || "unknown error"}`);
-      }
-    };
-    bubble.querySelector(".msg-edit-save").addEventListener("click", save);
-    editInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") save(); });
-    bubble.querySelector(".msg-edit-cancel").addEventListener("click", () => {
-      // Listener will re-render this bubble back to normal on the next
-      // snapshot anyway, but re-triggering isn't guaranteed instantly —
-      // easiest reliable fix is to just leave editing mode by re-running
-      // the render for this one message from current Firestore state.
-      onSnapshotForceRerender();
-    });
+    enterEditMode(bubble, msgRef);
   }
 });
 
