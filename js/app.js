@@ -157,6 +157,18 @@ export function liveName(uid, fallbackName) {
   return state.userCache[uid]?.displayName || fallbackName;
 }
 
+export function renderAvatar(entity) {
+  if (entity.isGroup) {
+    return entity.groupIcon
+      ? `<img class="chat-avatar chat-avatar-img" src="${entity.groupIcon}" alt="" />`
+      : `<div class="chat-avatar chat-avatar-blank"></div>`;
+  }
+  const photo = state.userCache[entity.uid]?.photoURL || entity.photoURL;
+  return photo
+    ? `<img class="chat-avatar chat-avatar-img" src="${photo}" alt="" />`
+    : `<div class="chat-avatar">${initials(entity.displayName)}</div>`;
+}
+
 // ---- chat list ----
 let hasAutoOpenedAChat = false;
 function listenToChats() {
@@ -183,7 +195,7 @@ function listenToChats() {
       const chat = docSnap.data();
       let peer;
       if (chat.isGroup) {
-        peer = { displayName: chat.groupName || "Group", isGroup: true, participantInfo: chat.participantInfo || {} };
+        peer = { displayName: chat.groupName || "Group", isGroup: true, participantInfo: chat.participantInfo || {}, groupIcon: chat.groupIcon, chatId: docSnap.id };
       } else {
         const peerUid = state.user.uid === chat.participants[0] ? chat.participants[1] : chat.participants[0];
         const peerInfo = chat.participantInfo?.[peerUid];
@@ -192,9 +204,15 @@ function listenToChats() {
       }
       if (!firstChat) firstChat = { id: docSnap.id, peer };
       const item = document.createElement("div");
+      const lastReadTime = chat.lastRead?.[state.user.uid] || 0;
+      const isUnread = chat.lastMessageSenderId && chat.lastMessageSenderId !== state.user.uid &&
+        (chat.lastMessageTime || 0) > lastReadTime;
       item.className = "chat-item" + (state.activeChatId === docSnap.id ? " active" : "");
       item.innerHTML = `
-        <div class="chat-avatar">${initials(peer.displayName)}</div>
+        <div class="chat-avatar-wrap">
+          ${renderAvatar(peer)}
+          ${isUnread ? `<span class="unread-dot"></span>` : ""}
+        </div>
         <div class="chat-item-meta">
           <div class="chat-item-name">${escapeHtml(peer.displayName)}</div>
           <div class="chat-item-preview">${escapeHtml(chat.lastMessage || "Say hello")}</div>
