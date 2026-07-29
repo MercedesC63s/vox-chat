@@ -20,6 +20,7 @@ export function openChat(chatId, peer) {
   if (state.unsubChatDoc) state.unsubChatDoc();
 
   state.activeChatId = chatId;
+  updateDoc(doc(db, "chats", chatId), { [`lastRead.${state.user.uid}`]: Date.now() }).catch(() => {});
   state.activePeer = peer;
 
   chatEmpty.hidden = true;
@@ -152,7 +153,7 @@ document.getElementById("form-message").addEventListener("submit", async (e) => 
       clientTime: Date.now(),   // set immediately — used for sort order and display, no server round-trip
       createdAt: serverTimestamp() // kept for reference, not used for ordering
     });
-    await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text, lastMessageSenderId: state.user.uid });
+    await updateDoc(doc(db, "chats", state.activeChatId), { lastMessage: text, lastMessageSenderId: state.user.uid, lastMessageTime: Date.now() });
   } catch (err) {
     console.error("Send message failed:", err);
     showToast(`Message didn't send: ${err.code || err.message || "unknown error"}`);
@@ -246,7 +247,8 @@ mediaInput?.addEventListener("change", async () => {
     });
     await updateDoc(doc(db, "chats", state.activeChatId), {
       lastMessage: mediaType === "image" ? "📷 Image" : "🎥 Video",
-      lastMessageSenderId: state.user.uid
+      lastMessageSenderId: state.user.uid,
+      lastMessageTime: Date.now()
     });
   } catch (err) {
     console.error("Media upload failed:", err);
